@@ -23,7 +23,7 @@
 1. 下载仓库 ZIP，解压后确保目录名为 `com.jeffjiang.ecommerce-design-assistant-cep`。
 2. 将整个目录复制到 Windows 的 CEP 扩展目录：
 
-   `%APPDATA%\\Adobe\\CEP\\extensions\\com.jeffjiang.ecommerce-design-assistant-cep`
+   `%APPDATA%\Adobe\CEP\extensions\com.jeffjiang.ecommerce-design-assistant-cep`
 
 3. 如果 Photoshop 尚未允许未签名 CEP 扩展，请按 Adobe CEP 的调试扩展文档设置 `PlayerDebugMode`。
 4. 完全退出并重新打开 Photoshop，在“窗口 → 扩展（旧版）”中打开“鑫洋助理”。
