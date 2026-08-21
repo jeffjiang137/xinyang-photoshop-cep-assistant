@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>参考线</title>
+<link rel="stylesheet" href="guide.css?v=2.2.05">
+</head>
+<body>
+<svg class="svg-sprite" aria-hidden="true" focusable="false">
+  <symbol id="i-padding-left" viewBox="0 0 24 24"><path d="M4 4v16M8 6v12M12 8h8M12 16h8"/></symbol>
+  <symbol id="i-padding-right" viewBox="0 0 24 24"><path d="M20 4v16M16 6v12M4 8h8M4 16h8"/></symbol>
+  <symbol id="i-padding-top" viewBox="0 0 24 24"><path d="M4 4h16M6 8h12M8 12v8M16 12v8"/></symbol>
+  <symbol id="i-padding-bottom" viewBox="0 0 24 24"><path d="M4 20h16M6 16h12M8 4v8M16 4v8"/></symbol>
+  <symbol id="i-column" viewBox="0 0 24 24"><rect x="4" y="5" width="6" height="14"/><rect x="14" y="5" width="6" height="14"/></symbol>
+  <symbol id="i-row" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="6"/><rect x="5" y="14" width="14" height="6"/></symbol>
+  <symbol id="i-column-width" viewBox="0 0 24 24"><path d="M5 4v16M19 4v16M8 12h8M8 12l3-3M8 12l3 3M16 12l-3-3M16 12l-3 3"/></symbol>
+  <symbol id="i-row-height" viewBox="0 0 24 24"><path d="M4 5h16M4 19h16M12 8v8M12 8l-3 3M12 8l3 3M12 16l-3-3M12 16l3-3"/></symbol>
+  <symbol id="i-column-space" viewBox="0 0 24 24"><path d="M4 5v14M20 5v14M8 7v10M16 7v10M10 12h4M10 12l2-2M10 12l2 2M14 12l-2-2M14 12l-2 2"/></symbol>
+  <symbol id="i-row-space" viewBox="0 0 24 24"><path d="M5 4h14M5 20h14M7 8h10M7 16h10M12 10v4M12 10l-2 2M12 10l2 2M12 14l-2-2M12 14l2-2"/></symbol>
+  <symbol id="i-column-center" viewBox="0 0 24 24"><path d="M12 3v18M4 8h5M15 8h5M4 16h5M15 16h5"/></symbol>
+  <symbol id="i-row-center" viewBox="0 0 24 24"><path d="M3 12h18M8 4v5M16 4v5M8 15v5M16 15v5"/></symbol>
+  <symbol id="i-assign" viewBox="0 0 24 24"><path d="M6 7h9M12 4l3 3-3 3M18 17H9M12 14l-3 3 3 3"/></symbol>
+  <symbol id="i-guide-left" viewBox="0 0 24 24"><rect class="guide-target" x="8" y="5" width="11" height="14" rx="1.8"/><path class="guide-line" d="M5.5 3.5v17"/></symbol>
+  <symbol id="i-guide-right" viewBox="0 0 24 24"><rect class="guide-target" x="5" y="5" width="11" height="14" rx="1.8"/><path class="guide-line" d="M18.5 3.5v17"/></symbol>
+  <symbol id="i-guide-top" viewBox="0 0 24 24"><rect class="guide-target" x="5" y="8" width="14" height="11" rx="1.8"/><path class="guide-line" d="M3.5 5.5h17"/></symbol>
+  <symbol id="i-guide-bottom" viewBox="0 0 24 24"><rect class="guide-target" x="5" y="5" width="14" height="11" rx="1.8"/><path class="guide-line" d="M3.5 18.5h17"/></symbol>
+  <symbol id="i-guide-center" viewBox="0 0 24 24"><rect class="guide-target" x="5" y="5" width="14" height="14" rx="1.8"/><path class="guide-line" d="M12 3.5v17"/></symbol>
+  <symbol id="i-guide-middle" viewBox="0 0 24 24"><rect class="guide-target" x="5" y="5" width="14" height="14" rx="1.8"/><path class="guide-line" d="M3.5 12h17"/></symbol>
+  <symbol id="i-eraser" viewBox="0 0 24 24"><path d="m7 17-3-3 8-8a2 2 0 0 1 3 0l3 3a2 2 0 0 1 0 3l-5 5H7ZM10 9l5 5M7 17h12"/></symbol>
+  <symbol id="i-arrow-down" viewBox="0 0 24 24"><path d="m7 9 5 5 5-5"/></symbol>
+  <symbol id="i-perspective" viewBox="0 0 80 64"><path d="M4 60 40 32 76 60M4 4l36 28L76 4M0 32h80M12 60l28-28 28 28M12 4l28 28L68 4"/></symbol>
+  <symbol id="i-horizon" viewBox="0 0 80 64"><path d="M4 32h72M12 27v10M68 27v10M21 29v6M59 29v6"/></symbol>
+  <symbol id="i-paint" viewBox="0 0 24 24"><path d="M12 4a8 8 0 1 0 0 16h2a2 2 0 0 0 0-4h-1a2 2 0 0 1 0-4h3a4 4 0 0 0 0-8h-4Z"/><circle cx="7.5" cy="10" r="1"/><circle cx="10" cy="7" r="1"/><circle cx="15" cy="7.5" r="1"/></symbol>
+  <symbol id="i-hide-grid" viewBox="0 0 24 24"><path d="M3 12s3-5 9-5 9 5 9 5-3 5-9 5-9-5-9-5Z"/><circle cx="12" cy="12" r="2.5"/><path d="M4 4l16 16"/></symbol>
+</svg>
+<div class="guide-app">
+  <div class="tabs" role="tablist" aria-label="参考线工具分类">
+    <button class="tab active" data-tab="reference" type="button">参考线</button>
+    <button class="tab" data-tab="composition" type="button">构图</button>
+    <button class="tab" data-tab="perspective" type="button">透视线</button>
+  </div>
+
+  <section class="tab-panel active" id="reference-panel">
+    <div class="guide-form">
+      <div class="separator"></div>
+      <div class="quick-footer" aria-label="快捷参考线">
+        <button data-quick="guide-left" title="左边界"><svg><use href="#i-guide-left"/></svg></button>
+        <button data-quick="guide-right" title="右边界"><svg><use href="#i-guide-right"/></svg></button>
+        <button data-quick="guide-top" title="顶边界"><svg><use href="#i-guide-top"/></svg></button>
+        <button data-quick="guide-bottom" title="底边界"><svg><use href="#i-guide-bottom"/></svg></button>
+        <button data-quick="guide-center" title="垂直中心"><svg><use href="#i-guide-center"/></svg></button>
+        <button data-quick="guide-middle" title="水平中心"><svg><use href="#i-guide-middle"/></svg></button>
+        <button id="clear-guides" title="清除全部参考线；Ctrl 清除水平，Shift 清除垂直"><svg class="eraser"><use href="#i-eraser"/></svg></button>
+      </div>
+      <div class="separator"></div>
+
+      <div id="preset-panel" class="preset-panel" hidden>
+        <div id="preset-list" class="preset-list"></div>
+      </div>
+
+      <div id="reference-form" class="form-wrap">
+        <div class="field-grid" id="field-grid"></div>
+        <div class="button-group">
+          <div class="button-row primary-row"><button id="create-guides" type="button">添加参考线</button></div>
+          <div class="button-row"><button id="save-preset" type="button">保存当前参数到预设</button></div>
+          <div class="button-row"><button id="reset-form" class="reset" type="button">重置参数</button></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="target-bar">
+      <label class="target-label" id="target-label" title="优先使用当前选区，其次选中图层，最后画布">
+        <span>应用到当前选区/图层</span>
+        <input id="use-layer" type="checkbox" checked>
+        <i></i>
+      </label>
+      <button id="toggle-presets" class="preset-toggle" type="button">预设 <svg><use href="#i-arrow-down"/></svg></button>
+    </div>
+  </section>
+
+  <section class="tab-panel" id="composition-panel">
+    <div id="composition-grid" class="composition-grid"></div>
+  </section>
+
+  <section class="tab-panel" id="perspective-panel">
+    <div class="perspective-grid">
+      <button class="perspective-card" data-perspective="perspective" type="button"><span>透视线</span><svg><use href="#i-perspective"/></svg></button>
+      <button class="perspective-card" data-perspective="horizon" type="button"><span>水平线</span><svg><use href="#i-horizon"/></svg></button>
+      <div class="perspective-actions">
+        <button id="change-overlay-color" class="mini-card" title="切换构图线颜色" type="button"><svg><use href="#i-paint"/></svg></button>
+        <button id="toggle-overlays" class="mini-card" title="显示或隐藏构图、透视线" type="button"><svg><use href="#i-hide-grid"/></svg></button>
+      </div>
+    </div>
+  </section>
+  <div id="toast" class="toast" aria-live="polite"></div>
+</div>
+<script src="guide.js?v=2.2.05"></script>
+</body>
+</html>

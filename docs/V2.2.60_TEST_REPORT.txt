@@ -1,0 +1,15 @@
+鑫洋助理 v2.2.60 宿主加载与拼图回归记录
+
+一、修复范围
+1. module-loader 每次宿主重载创建新的加载器代际，并将模块注册表固定到 `$.global.XinyangHostModules`。
+2. manifest 不再自动执行 ScriptPath；宿主脚本由 runtime.js 负责版本探测、串行加载和诊断。
+3. host.jsx 增加宿主启动阶段标记、失败边界和全局发布的 `LongStitchCEP`。
+4. 拼图模块启动期预加载；拼图、间距、切片、工具的 `suspendHistory` 回调使用 `$.global.LongStitchCEP`。
+5. runtime.js 记录实际发送脚本长度、参数长度和 Photoshop 原始返回摘要。
+
+二、验证结果
+1. JavaScript：runtime.js 通过 `node --check --input-type=commonjs`。
+2. ExtendScript：host.jsx、stitch-slice.jsx 去除 Photoshop 预处理指令后通过 Node 语法检查；此前全量 26 个 JSX 已完成同样检查。
+3. Photoshop 2026：宿主重载返回 `2.2.60`，拼图模块启动预加载未报告 `stitch-module` 错误。
+4. 历史问题证据：createLongStitch 的发送脚本 747 字符、参数 546 字符，原始返回 `EvalScript error.`，因此不是 CEP 脚本长度问题。
+5. 最终“创建成功、图层数量、画布高度、Ctrl+Z”实机复测待面板重新打开后完成，未提前标记为通过。

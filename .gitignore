@@ -1,0 +1,37 @@
+# Local runtime state and credentials
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+config/
+logs/
+*.log
+*secret*.json
+*credentials*.json
+
+# User and build artifacts
+node_modules/
+dist/
+build/
+coverage/
+*.psd
+*.psb
+*.zip
+*.7z
+*.rar
+*.exe
+*.dmg
+*.bak
+*.tmp
+*.swp
+
+# Operating system/editor files
+.DS_Store
+Thumbs.db
+*.code-workspace
+.idea/
+.vscode/
+
+# Internal agent/developer instructions are not part of the public extension
+AGENTS.md
+.agents/
+.codex/

@@ -1,0 +1,61 @@
+鑫洋助理 v2.2.58 真正按需加载回归报告
+
+一、变更范围
+1. index.html 移除 OCR、LaMa、IOPaint、Smart Slice、Typography、Tools 子模块的首屏同步 script。
+2. runtime.js 增加 PANEL_MODULES / FEATURE_MODULES 串行按需加载，并取消导航 hover/focus 预加载。
+3. panel.js 将 OCR/LaMa/IOPaint 初始化延后到进入改字/设置面板后。
+4. 新增 js/modules/common/file-io.js，使智能切片不再依赖 OCR Service。
+5. tools.js 支持文档工具与文字工具分离激活，Typography 首次进入对应面板才初始化。
+6. host.jsx 改为宿主业务域首次调用才 $.evalFile()；module-loader.jsx 增加单模块缓存加载。
+
+二、自动回归
+1. 浏览器 JS 语法：全部 node --check 通过。
+2. 默认 stitch-panel：模拟 runtime 启动后可选模块集合为空。
+3. Smart Slice：首次调用只加载 fileIO + smartSliceAnalyzer。
+4. Settings：按顺序加载 baiduTranslator + OCR/LaMa/IOPaint service；不加载 OCR analyzer。
+5. Text/OCR：在 service 已存在时只追加 OCR analyzer；无重复加载。
+6. Typography：进入面板后加载 typography + tools，依赖缓存复用。
+7. Document Tools：加载 import-export + transform + tools，tools 不重复加载。
+8. ExtendScript 模拟启动：host 初始仅加载 shared/layers/colors/layer-tools 四个模块。
+9. 首次调用 getDiagnosticInfo：仅追加 diagnostics.jsx。
+10. 首次调用 toolsGetFonts：仅追加 text-tools.jsx；重复调用不重复 evalFile。
+11. v2.2.57 与 v2.2.58 LongStitchCEP methods：124 项，名称与顺序一致。
+12. 版本号检查：runtime / host / diagnostics / manifest / index / README 统一为 2.2.58。
+13. 安装包 ZIP CRC 完整性检查通过。
+
+三、加载量
+- v2.2.58 index.html 首屏固定 JS：约 171 KB。
+- v2.2.57 对应首屏脚本集合：约 551 KB。
+- 首屏 JS 解析量约下降 68.9%。
+
+四、Photoshop 实机回归项目
+自动环境不能替代 Photoshop DOM/Action Manager，请安装后重点验证：
+1. 插件默认拼图页启动、页面切换与重新加载。
+2. 改字首次进入时 OCR/LaMa 状态正常显示；识别、擦除、IOPaint 启停正常。
+3. 文字页首次进入字体和实时属性正常；多选文字修改与 Ctrl+Z 正常。
+4. 文档页导入、文件瘦身、导出正常。
+5. 智能切片首次点击可完成像素分析，普通拼图源切片不额外加载 OCR。
+6. 嵌入下方图层、多剪切栈和自动嵌入正常。
+7. 框架、参考线第一次调用无延迟错误且后续调用正常。
+8. 关闭/切换面板时后台监听与 IOPaint 生命周期正常。
+
+四（一）、宿主加载诊断增强（2026-08-15）
+1. runtime.js 记录宿主版本探测、宿主脚本路径、$.evalFile 阶段、返回值摘要、耗时和失败阶段。
+2. 记录宿主脚本启动失败、调用前置检查失败、强制重载重试及重试失败，并保留调用方法名。
+3. runtime.js 早于 diagnostics.js 加载时先缓存最多 80 条启动日志，diagnostics.js 加载后自动转入调试报告。
+4. runtime.js 与 diagnostics.js 语法检查通过；Photoshop 实机需复现一次宿主加载失败，确认导出报告包含 runtime.hostscript.* 记录。
+5. 修复 host.jsx 重载时 module-loader 的跨代 loadedMap 残留：每次宿主脚本重载都会创建新的加载器代际，避免跳过核心 JSX 的实际加载。
+6. 移除 manifest 的自动 ScriptPath，宿主脚本统一由 runtime.js 负责版本探测和串行加载，避免启动阶段 JSX 失败污染 CEP ExtendScript 引擎。
+
+四（二）、本轮实机复现与入口诊断（2026-08-15）
+1. Photoshop 2026 实机点击“创建 1920px 分层长图”后，确认版本探测阶段已通过，失败收敛到 host.jsx 重载执行阶段。
+2. host.jsx 增加宿主启动阶段标记和统一错误边界，下一次加载会区分 module-loader、core-modules、public-api-init 等阶段，并携带 ExtendScript 行号。
+3. runtime.js / diagnostics.js 查询参数更新为 hostdiag2，确保 CEP 面板重载时读取本轮诊断代码。
+4. host.jsx 与全部 26 个 JSX 文件静态语法检查通过；仍需用户重启 Photoshop 或点击插件设置中的“重新加载插件”后复测一次。
+5. 复现得到的实际错误为 `XinyangHostModules.coreShared 不是函数`；根因是 module-loader 在 `loadOne()` 函数作用域内执行 `$.evalFile()`，核心模块注册到了临时表。已改为显式绑定 `$.global.XinyangHostModules`，并显式发布 `XinyangHostModuleLoader` 供按需模块使用。
+
+四（三）、宿主回调边界修复（2026-08-15）
+1. 拼图模块已纳入宿主启动阶段预加载；Photoshop 实机重载返回宿主版本 `2.2.60`，未再出现 `stitch-module` 启动失败，排除首次动态解析拼图 JSX 为主因。
+2. 实机调用记录确认：发送脚本长度 747、参数长度 546；失败原始返回为 `EvalScript error.`（CEP error code 38），排除调用脚本过长。
+3. `LongStitchCEP` 显式发布到 `$.global`，并将拼图、间距、切片及工具的 `suspendHistory` 回调改为 `$.global.LongStitchCEP...`，避免 Photoshop 在历史回调上下文中找不到 CEP 宿主对象。
+4. `host.jsx`、`stitch-slice.jsx` 和 `runtime.js` 静态语法检查通过。面板重载后的最终 Photoshop 创建结果仍需在拼图面板恢复后复测；本轮未将“成功创建/撤销验证”记为通过。

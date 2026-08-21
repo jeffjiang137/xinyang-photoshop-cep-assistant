@@ -1,0 +1,48 @@
+name: Bug report
+description: 报告可复现的问题
+title: "[Bug] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        请先确认问题不是由 Photoshop 文档本身或外部 OCR/LaMa 服务引起，并删除所有密钥和素材。
+  - type: input
+    id: photoshop-version
+    attributes:
+      label: Photoshop 版本
+      placeholder: 例如 Photoshop 25.0.0
+    validations:
+      required: true
+  - type: input
+    id: plugin-version
+    attributes:
+      label: 插件版本
+      placeholder: 例如 2.2.69
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: 请按顺序写出最小复现步骤。
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期结果
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际结果
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: 脱敏诊断信息
+      description: 可粘贴“设置 → 导出调试报告”的相关片段；不要上传密钥、PSD 或原图。

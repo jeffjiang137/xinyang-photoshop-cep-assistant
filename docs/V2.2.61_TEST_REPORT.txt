@@ -1,0 +1,16 @@
+鑫洋助理 v2.2.61 长图创建修复回归报告
+
+一、日志定位
+1. Photoshop 已成功加载 v2.2.60 宿主脚本并进入 createLongStitch。
+2. 实际失败信息：collectSpacingSourceEntries 不是函数（jsx/modules/core/shared.jsx 第 339 行）。
+3. 失败发生在图片已置入后的“初始化间距状态”步骤，不是图片路径、CEP 缓存或脚本长度问题。
+
+二、修复
+1. core/shared.jsx 的 initializeSpacingState 改为接收拼图源图层 ID，不再跨模块调用 stitch-slice.jsx 的私有函数。
+2. stitch-slice.jsx 创建长图后将本次 sourceLayerIds 传入初始化函数；间距状态只包含拼图图片，不会包含锁定白底。
+3. runtime、host、manifest 和面板版本同步更新至 2.2.61，确保 Photoshop 重新载入修复后的宿主代码。
+
+三、验证
+1. node --check js/runtime.js、node --check js/diagnostics.js、node --check js/panel.js 通过。
+2. manifest.xml 可解析且版本为 2.2.61。
+3. Photoshop 手工验证：选两张 JPG 或 PNG，分别创建 790px / 1920px 长图；确认新文档、智能对象、锁定白底与单次 Ctrl+Z。

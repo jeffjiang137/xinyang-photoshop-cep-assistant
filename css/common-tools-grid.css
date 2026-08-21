@@ -1,0 +1,1101 @@
+.common-tools-shell {
+  margin: -2px -1px 0;
+  padding: 0 2px 6px;
+}
+
+.common-tools-title {
+  margin: 0 0 8px;
+  color: #f2f2f2;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.common-scale-row {
+  display: grid;
+  grid-template-columns: minmax(82px, 1.35fr) repeat(4, minmax(34px, .65fr));
+  gap: 5px;
+  margin-bottom: 5px;
+}
+
+.common-scale-row button,
+.common-align-row button {
+  height: 28px;
+  min-width: 0;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 5px;
+  color: #f4f4f4;
+  background: #4a4a4a;
+  font-size: 11px;
+}
+
+.common-scale-row button:hover,
+.common-align-row button:hover {
+  background: #5b5b5b;
+}
+
+.common-scale-control {
+  position: relative;
+  display: flex;
+  height: 28px;
+  min-width: 0;
+  align-items: center;
+  gap: 3px;
+  padding: 0 4px 0 8px;
+  border-radius: 5px;
+  color: #cfcfcf;
+  background: #363636;
+  font-size: 11px;
+}
+
+.common-scale-control span {
+  white-space: nowrap;
+}
+
+.common-scale-control input {
+  width: 38px;
+  min-width: 0;
+  height: 22px;
+  margin-left: auto;
+  padding: 0 3px;
+  border: 0;
+  border-radius: 3px;
+  outline: none;
+  color: #f3f3f3;
+  background: #292929;
+  font-size: 10px;
+  text-align: center;
+}
+
+.common-align-row {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 5px;
+  margin: 9px -2px 13px;
+  padding: 8px 5px;
+  border-top: 1px solid #505050;
+  border-bottom: 1px solid #505050;
+}
+
+.common-align-row button {
+  height: 27px;
+  background: transparent;
+  opacity: .78;
+}
+
+.common-align-row button:hover {
+  background: #494949;
+  opacity: 1;
+}
+
+.common-align-row img {
+  width: 20px;
+  height: 20px;
+}
+
+.common-tools-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  column-gap: 8px;
+  row-gap: 14px;
+}
+
+.common-tool-item {
+  position: relative;
+  min-width: 0;
+  text-align: center;
+}
+
+.common-tool-button {
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  color: #ececec;
+  background: transparent;
+  text-align: center;
+}
+
+.common-tool-icon {
+  display: flex;
+  width: 50px;
+  height: 50px;
+  margin: 0 auto 6px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: #4a4a4a;
+  transition: background .12s ease, transform .12s ease;
+}
+
+.common-tool-button:hover .common-tool-icon {
+  background: #595959;
+  transform: translateY(-1px);
+}
+
+.common-tool-button:active .common-tool-icon {
+  transform: translateY(0);
+}
+
+.common-tool-icon img {
+  width: 27px;
+  height: 27px;
+  pointer-events: none;
+}
+
+.common-tool-label {
+  display: block;
+  overflow: hidden;
+  color: #f1f1f1;
+  font-size: 11px;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.common-tool-more {
+  position: absolute;
+  top: 2px;
+  left: calc(50% + 12px);
+  display: flex;
+  width: 18px;
+  height: 15px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  opacity: .8;
+}
+
+.common-tool-more:hover {
+  background: rgba(255,255,255,.09);
+  opacity: 1;
+}
+
+.common-tool-more img {
+  width: 14px;
+  height: 14px;
+}
+
+.common-tools-parameter-drawer {
+  margin-top: 12px;
+}
+
+.common-tools-parameter-drawer.drawer-collapsed .tool-detail {
+  display: none !important;
+}
+
+.common-tools-parameter-drawer .tool-detail {
+  box-shadow: 0 5px 16px rgba(0,0,0,.18);
+}
+
+@media (max-width: 300px) {
+  .common-tools-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .common-scale-row {
+    grid-template-columns: minmax(76px, 1.2fr) repeat(2, minmax(34px, .8fr));
+  }
+  .common-scale-row button:nth-of-type(n+3) {
+    display: none;
+  }
+}
+
+/* v2.1.5：参数区跟随当前工具行展开 */
+.common-tools-grid > .common-tools-parameter-drawer {
+  grid-column: 1 / -1;
+  min-width: 0;
+  margin: -2px -2px 2px;
+  padding: 0 2px;
+}
+
+.common-tools-grid > .common-tools-parameter-drawer .tool-detail {
+  margin: 0;
+  border-top: 1px solid #565656;
+  border-bottom: 1px solid #444;
+  box-shadow: 0 5px 16px rgba(0,0,0,.18);
+}
+
+.common-tool-item.detail-row-active .common-tool-icon {
+  background: #545454;
+  box-shadow: inset 0 0 0 1px rgba(74, 105, 255, .9);
+}
+
+.common-tool-item.detail-row-active .common-tool-label {
+  color: #ffffff;
+}
+
+/* v2.1.5：中心/边缘翻转快捷行 */
+.common-flip-row {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 5px;
+  margin: -8px -2px 13px;
+  padding: 0 5px 8px;
+  border-bottom: 1px solid #505050;
+}
+
+.common-flip-row button {
+  display: flex;
+  height: 27px;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  opacity: .78;
+}
+
+.common-flip-row button:hover {
+  background: #494949;
+  opacity: 1;
+}
+
+.common-flip-row img {
+  width: 20px;
+  height: 20px;
+  pointer-events: none;
+}
+
+/* v2.1.5：画布居中与多选元素等间距分布，高对比图标 */
+.common-layout-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+  margin: -8px -2px 13px;
+  padding: 0 5px 8px;
+  border-bottom: 1px solid #505050;
+}
+
+.common-layout-row button {
+  display: flex;
+  height: 27px;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  opacity: .78;
+}
+
+.common-layout-row button:hover {
+  background: #494949;
+  opacity: 1;
+}
+
+.common-layout-row button {
+  color: #e6e6e6;
+  opacity: .96;
+}
+
+.common-layout-row button:active {
+  background: #565656;
+}
+
+.common-layout-row img {
+  width: 20px;
+  height: 20px;
+  pointer-events: none;
+  opacity: 1;
+}
+
+/* 新增一行后，翻转行单独保留底部分隔，避免两行之间重复留白 */
+.common-layout-row + .common-flip-row {
+  margin-top: -8px;
+}
+
+/* v2.1.8：嵌入图片自动化开关纵向排列 */
+.embed-auto-options {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+
+.embed-auto-options label {
+  min-height: 28px;
+}
+
+.embed-auto-options label.option-disabled {
+  opacity: .38;
+  color: #7f858d;
+  cursor: default;
+}
+
+.embed-auto-options label.option-disabled input {
+  cursor: default;
+}
+
+
+/* v2.1.14：常用功能首屏完整显示 */
+.common-tools-shell {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0 0 6px;
+  overflow-x: hidden;
+}
+
+.common-scale-row {
+  grid-template-columns: minmax(68px, 1.2fr) repeat(4, minmax(28px, .72fr));
+  gap: 4px;
+}
+
+.common-scale-row button,
+.common-scale-control {
+  height: 27px;
+  font-size: 10px;
+}
+
+.common-scale-control {
+  padding-right: 3px;
+  padding-left: 6px;
+}
+
+.common-scale-control input {
+  width: 34px;
+  font-size: 9px;
+}
+
+.common-align-row,
+.common-layout-row,
+.common-flip-row {
+  margin-right: 0;
+  margin-left: 0;
+  padding-right: 2px;
+  padding-left: 2px;
+}
+
+.common-tools-grid {
+  column-gap: 6px;
+  row-gap: 12px;
+}
+
+.common-tool-icon {
+  width: 46px;
+  height: 46px;
+  margin-bottom: 5px;
+}
+
+.common-tool-icon img {
+  width: 25px;
+  height: 25px;
+}
+
+.common-tool-label {
+  font-size: 10px;
+  line-height: 15px;
+}
+
+@media (max-width: 300px) {
+  .common-tools-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .common-scale-row {
+    grid-template-columns: minmax(64px, 1.15fr) repeat(4, minmax(26px, .7fr));
+  }
+  .common-scale-row button:nth-of-type(n+3) {
+    display: block;
+  }
+}
+
+
+/* v2.1.25：参数抽屉固定插入当前选中工具所在行下方 */
+.common-tools-grid > .common-tools-parameter-drawer {
+  grid-column: 1 / -1 !important;
+  width: 100%;
+  max-width: 100%;
+  margin: 0 !important;
+  padding: 2px 0 4px !important;
+  align-self: start;
+}
+.common-tools-grid > .common-tools-parameter-drawer .tool-detail {
+  width: 100%;
+  margin: 0;
+  padding-top: 9px;
+  border-top: 1px solid #5b5b5b;
+  border-bottom: 1px solid #414141;
+  background: #353535;
+  box-shadow: none;
+}
+.common-tool-item.detail-row-active::after {
+  position:absolute; right:12px; bottom:-8px; left:12px; height:2px;
+  border-radius:2px; background:#6f8cff; content:"";
+}
+
+/* v2.1.25：图牛式紧凑展开层与工具卡片细节 */
+.common-tool-item {
+  overflow: visible;
+}
+
+.common-tool-icon {
+  position: relative;
+  overflow: hidden;
+}
+
+.common-tool-more {
+  top: 4px;
+  left: 50%;
+  width: 15px;
+  height: 12px;
+  transform: translateX(6px);
+  border-radius: 3px;
+  opacity: .9;
+  z-index: 2;
+}
+
+.common-tool-more:hover,
+.common-tool-more:focus {
+  background: rgba(255,255,255,.10);
+}
+
+.common-tool-more img {
+  width: 13px;
+  height: 13px;
+  display: block;
+}
+
+.common-tools-grid > .common-tools-parameter-drawer {
+  grid-column: 1 / -1 !important;
+  width: 100%;
+  margin: -3px 0 5px !important;
+  padding: 0 !important;
+  background: #3b3b3b;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  overflow: hidden;
+}
+
+.common-tools-grid > .common-tools-parameter-drawer .tool-detail {
+  width: 100%;
+  margin: 0 !important;
+  padding: 8px 8px 9px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.common-tools-parameter-drawer .tool-detail-title,
+.common-tools-parameter-drawer .compact-hint {
+  display: none !important;
+}
+
+.common-tools-parameter-drawer .check-grid,
+.common-tools-parameter-drawer .tool-form,
+.common-tools-parameter-drawer .transform-grid {
+  margin: 0;
+  padding: 0;
+  gap: 5px 8px;
+}
+
+.common-tools-parameter-drawer .check-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.common-tools-parameter-drawer .embed-auto-options {
+  grid-template-columns: 1fr;
+}
+
+.common-tools-parameter-drawer .check-grid label,
+.common-tools-parameter-drawer .inline-check {
+  min-height: 22px;
+  margin: 0;
+  padding: 1px 0;
+  line-height: 20px;
+  border: 0;
+  background: transparent;
+}
+
+.common-tools-parameter-drawer .tool-form label {
+  gap: 3px;
+  margin: 0;
+}
+
+.common-tools-parameter-drawer .tool-form label > span {
+  font-size: 9px;
+  line-height: 13px;
+}
+
+.common-tools-parameter-drawer input:not([type="checkbox"]):not([type="radio"]),
+.common-tools-parameter-drawer select,
+.common-tools-parameter-drawer .button {
+  min-height: 27px;
+  height: 27px;
+  border-radius: 4px;
+}
+
+.common-tools-parameter-drawer .button.full {
+  margin-top: 6px;
+}
+
+.common-tools-parameter-drawer .inline-field {
+  gap: 4px;
+}
+
+.common-tools-parameter-drawer .inline-field .button {
+  width: auto;
+  min-width: 48px;
+  margin-top: 0;
+}
+
+.common-tools-parameter-drawer .transform-grid button {
+  min-height: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 4px;
+  background: #494949;
+}
+
+.common-tool-item.detail-row-active .common-tool-icon {
+  box-shadow: inset 0 0 0 1px #4d7fff;
+}
+
+.common-tool-item.detail-row-active::after {
+  display: none !important;
+}
+
+@media (max-width: 285px) {
+  .common-tools-parameter-drawer .check-grid,
+  .common-tools-parameter-drawer .tool-form.two-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* v2.1.25：常用工具展开层输入框不超出按钮背景 */
+.common-tools-parameter-drawer input:not([type="checkbox"]):not([type="radio"]),
+.common-tools-parameter-drawer select,
+.common-tools-parameter-drawer .button {
+  min-height: 0 !important;
+  height: 24px !important;
+  line-height: 22px;
+}
+.common-tools-parameter-drawer input[type="color"] {
+  height: 20px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+.common-scale-control input {
+  min-height: 0 !important;
+  height: 20px !important;
+}
+
+
+/* v2.1.26：找相同在当前按钮行下方展开，复刻图牛五按钮布局 */
+.common-tools-parameter-drawer .find-same-note {
+  margin: 0 0 7px;
+  padding: 0;
+  color: #b9b9b9;
+  font-size: 10px;
+  line-height: 16px;
+  text-align: center;
+}
+
+.common-tools-parameter-drawer .find-same-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 8px;
+  margin: 0;
+  padding: 0;
+}
+
+.common-tools-parameter-drawer .find-same-grid button {
+  width: 100%;
+  min-width: 0;
+  min-height: 28px;
+  height: 28px;
+  margin: 0;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: #494949;
+  color: #e5e5e5;
+  font: inherit;
+  font-size: 10px;
+  line-height: 26px;
+  text-align: center;
+  cursor: pointer;
+}
+
+.common-tools-parameter-drawer .find-same-grid button:hover,
+.common-tools-parameter-drawer .find-same-grid button:focus {
+  border-color: #4d7fff;
+  background: #535353;
+  outline: none;
+}
+
+.common-tools-parameter-drawer .find-same-grid button:active {
+  background: #3f5fbb;
+}
+
+@media (max-width: 285px) {
+  .common-tools-parameter-drawer .find-same-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* v2.1.27：图牛式七项常用功能面板 */
+.common-tool-item.auto-fill-active .common-tool-icon {
+  background: #40588d;
+  box-shadow: inset 0 0 0 1px #6e91ff, 0 0 8px rgba(77,127,255,.28);
+}
+.common-tool-item.auto-fill-active .common-tool-label {
+  color: #a9bdff;
+}
+
+.common-tools-parameter-drawer .tuniu-check-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 7px;
+  margin: 0;
+  padding: 1px 2px;
+}
+.common-tools-parameter-drawer .tuniu-check-list label,
+.common-tools-parameter-drawer .single-check,
+.common-tools-parameter-drawer .tuniu-radio-row label {
+  display: flex;
+  min-width: 0;
+  min-height: 23px;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: #ddd;
+  font-size: 10px;
+  line-height: 16px;
+}
+.common-tools-parameter-drawer input[type="checkbox"],
+.common-tools-parameter-drawer input[type="radio"] {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+.common-tools-parameter-drawer .tuniu-two-fields,
+.common-tools-parameter-drawer .tuniu-two-buttons {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+.common-tools-parameter-drawer .tuniu-two-fields + .tuniu-wide-button,
+.common-tools-parameter-drawer .tuniu-anchor-grid + .tuniu-two-buttons {
+  margin-top: 8px;
+}
+.common-tools-parameter-drawer .tuniu-wide-button,
+.common-tools-parameter-drawer .tuniu-two-buttons button,
+.common-tools-parameter-drawer .mini-button,
+.common-tools-parameter-drawer .tuniu-segmented button {
+  min-width: 0;
+  height: 27px !important;
+  min-height: 27px !important;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  outline: 0;
+  color: #eee;
+  background: #4a4a4a;
+  font: inherit;
+  font-size: 10px;
+  line-height: 25px;
+  cursor: pointer;
+}
+.common-tools-parameter-drawer .tuniu-wide-button {
+  width: 100%;
+}
+.common-tools-parameter-drawer .tuniu-wide-button:hover,
+.common-tools-parameter-drawer .tuniu-two-buttons button:hover,
+.common-tools-parameter-drawer .mini-button:hover,
+.common-tools-parameter-drawer .tuniu-segmented button:hover,
+.common-tools-parameter-drawer .tuniu-segmented button.active {
+  border-color: #587fff;
+  background: #535d77;
+}
+
+.common-tools-parameter-drawer .tuniu-full-input,
+.common-tools-parameter-drawer .tuniu-two-fields input,
+.common-tools-parameter-drawer .tuniu-inline-row input,
+.common-tools-parameter-drawer .tuniu-transform-fields input,
+.common-tools-parameter-drawer .tuniu-export-panel select {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  height: 27px !important;
+  min-height: 27px !important;
+  padding: 0 7px;
+  border: 1px solid #505050;
+  border-radius: 4px;
+  outline: none;
+  color: #f0f0f0;
+  background: #292929;
+  font-size: 10px;
+  line-height: 25px;
+}
+.common-tools-parameter-drawer input:focus,
+.common-tools-parameter-drawer select:focus {
+  border-color: #5d82ff !important;
+}
+.common-tools-parameter-drawer .tuniu-full-input {
+  margin-bottom: 7px;
+}
+.common-tools-parameter-drawer .tuniu-radio-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 14px;
+  margin: 7px 1px;
+}
+.common-tools-parameter-drawer .tuniu-radio-row.stacked {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 3px;
+}
+
+.common-tools-parameter-drawer .tuniu-transform-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 7px;
+}
+.common-tools-parameter-drawer .tuniu-transform-fields label {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  min-width: 0;
+  align-items: center;
+  border: 1px solid #505050;
+  border-radius: 4px;
+  background: #292929;
+  overflow: hidden;
+}
+.common-tools-parameter-drawer .tuniu-transform-fields label > span {
+  color: #aaa;
+  font-size: 11px;
+  text-align: center;
+}
+.common-tools-parameter-drawer .tuniu-transform-fields input {
+  border: 0;
+  border-left: 1px solid #484848;
+  border-radius: 0;
+}
+.common-tools-parameter-drawer .tuniu-anchor-grid {
+  display: grid;
+  width: 73px;
+  height: 73px;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 5px;
+  margin: 9px auto 0;
+  padding: 5px;
+  border: 1px solid #515151;
+  border-radius: 4px;
+  background: #2d2d2d;
+}
+.common-tools-parameter-drawer .tuniu-anchor-grid button {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #686868;
+}
+.common-tools-parameter-drawer .tuniu-anchor-grid button::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  transform: translate(-50%,-50%);
+  border-radius: 50%;
+  background: #bfbfbf;
+  content: "";
+}
+.common-tools-parameter-drawer .tuniu-anchor-grid button.active {
+  background: #4d7fff;
+  box-shadow: 0 0 0 2px rgba(77,127,255,.23);
+}
+.common-tools-parameter-drawer .tuniu-anchor-grid button.active::after {
+  background: #fff;
+}
+
+.common-tools-parameter-drawer .tuniu-export-panel {
+  display: grid;
+  gap: 7px;
+}
+.common-tools-parameter-drawer .tuniu-export-row.top-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.common-tools-parameter-drawer .tuniu-segmented {
+  display: grid;
+  flex: 1 1 auto;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px;
+  padding: 3px;
+  border-radius: 5px;
+  background: #292929;
+}
+.common-tools-parameter-drawer .tuniu-segmented button {
+  height: 24px !important;
+  min-height: 24px !important;
+  line-height: 22px;
+}
+.common-tools-parameter-drawer .quality-field,
+.common-tools-parameter-drawer .png-mode-field {
+  display: grid;
+  flex: 0 0 92px;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 5px;
+  color: #cfcfcf;
+  font-size: 10px;
+}
+.common-tools-parameter-drawer [hidden] {
+  display: none !important;
+}
+.common-tools-parameter-drawer .tuniu-inline-row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+}
+.common-tools-parameter-drawer .tuniu-inline-row.no-title {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.common-tools-parameter-drawer .field-title {
+  color: #c8c8c8;
+  font-size: 10px;
+}
+.common-tools-parameter-drawer .mini-button {
+  width: 48px;
+  padding: 0 5px;
+}
+.common-tools-parameter-drawer .tuniu-export-panel details {
+  margin: 0;
+  padding: 0 0 7px;
+  border-bottom: 1px solid #4b4b4b;
+}
+.common-tools-parameter-drawer .tuniu-export-panel details:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+.common-tools-parameter-drawer .tuniu-export-panel summary {
+  margin: 0 0 7px;
+  padding: 2px 0;
+  outline: 0;
+  color: #d8d8d8;
+  font-size: 10px;
+  cursor: pointer;
+}
+.common-tools-parameter-drawer .tuniu-export-panel details .tuniu-two-fields,
+.common-tools-parameter-drawer .tuniu-export-panel details .tuniu-inline-row,
+.common-tools-parameter-drawer .tuniu-export-panel details .single-check,
+.common-tools-parameter-drawer .tuniu-export-panel details .tuniu-two-buttons {
+  margin-bottom: 6px;
+}
+
+@media (max-width: 285px) {
+  .common-tools-parameter-drawer .tuniu-transform-fields,
+  .common-tools-parameter-drawer .tuniu-two-fields,
+  .common-tools-parameter-drawer .tuniu-two-buttons {
+    grid-template-columns: 1fr;
+  }
+  .common-tools-parameter-drawer .tuniu-export-row.top-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .common-tools-parameter-drawer .quality-field,
+  .common-tools-parameter-drawer .png-mode-field {
+    flex-basis: auto;
+  }
+}
+
+/* v2.1.29：顶部放大/缩小编辑框按图牛布局 */
+.common-zooms {
+  margin: 0 -2px 10px;
+}
+
+.common-zoom-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+  margin: 10px 0 0;
+  padding: 0 10px;
+}
+
+.common-zoom-row-in {
+  margin-top: 7px;
+}
+
+.tuniu-z-input {
+  display: flex;
+  width: 76px;
+  height: 24px;
+  flex: 0 0 76px;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: #282828;
+  box-sizing: border-box;
+}
+
+.tuniu-z-input.active,
+.tuniu-z-input:focus-within {
+  border-color: #304ffe;
+}
+
+.tuniu-z-input button {
+  display: flex;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  color: #c8c8c8;
+  background: transparent;
+  cursor: pointer;
+}
+
+.tuniu-z-left {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+}
+
+.tuniu-z-left img {
+  width: 13px;
+  height: 14px;
+}
+
+.tuniu-z-center {
+  width: calc(100% - 40px);
+  min-width: 0;
+  height: 22px;
+}
+
+.tuniu-z-center input {
+  width: 100% !important;
+  min-width: 0;
+  min-height: 0 !important;
+  height: 22px !important;
+  padding: 0 1px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  outline: 0 !important;
+  color: #c8c8c8 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  font-size: 10px;
+  line-height: 22px;
+  text-align: center;
+}
+
+.tuniu-z-center input::placeholder {
+  color: #686868;
+}
+
+.tuniu-z-right {
+  width: 18px;
+  height: 22px;
+  flex: 0 0 18px;
+}
+
+.tuniu-z-right img {
+  width: 10px;
+  height: 10px;
+  transition: transform .16s ease;
+}
+
+.tuniu-z-right[aria-expanded="true"] img {
+  transform: rotate(180deg);
+}
+
+.common-zoom-buttons {
+  display: grid;
+  min-width: 0;
+  flex: 1 1 auto;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.common-zoom-buttons button,
+.common-zoom-items button {
+  min-width: 0;
+  min-height: 0 !important;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: #c8c8c8;
+  background: #282828;
+  cursor: pointer;
+  font-size: 10px;
+}
+
+.common-zoom-buttons button {
+  height: 24px;
+}
+
+.common-zoom-buttons button:hover,
+.common-zoom-items button:hover {
+  border-color: #304ffe;
+  background: #282828;
+}
+
+.common-zoom-items {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 7px 5px;
+  padding: 10px 10px 3px;
+  background: #383838;
+}
+
+.common-zoom-items[hidden] {
+  display: none !important;
+}
+
+.common-zoom-items button {
+  height: 22px;
+}
+
+@media (max-width: 300px) {
+  .common-zoom-row {
+    padding-right: 5px;
+    padding-left: 5px;
+  }
+  .common-zoom-items {
+    padding-right: 5px;
+    padding-left: 5px;
+  }
+}
+
+/* v2.1.73 文件瘦身：保持图牛式三项设置和双按钮在窄面板内完整显示。 */
+.common-tools-parameter-drawer .file-slim-options {
+  gap: 6px;
+}
+.common-tools-parameter-drawer .file-slim-actions {
+  margin-top: 8px;
+}
+.common-tool-snap { position: relative; }
+.common-tool-snap-icon { font-size: 24px; font-weight: 700; line-height: 1; color: #aeb7c8; }
+.common-tool-snap .common-tool-state { position: absolute; top: 8px; right: 9px; width: 6px; height: 6px; border-radius: 50%; background: #747474; }
+.common-tool-item.smart-snap-active .common-tool-snap { border-color: #8d78ff; background: rgba(104, 82, 232, .18); }
+.common-tool-item.smart-snap-active .common-tool-snap-icon { color: #a997ff; }
+.common-tool-item.smart-snap-active .common-tool-state { background: #a997ff; box-shadow: 0 0 7px #a997ff; }
+.common-tools-parameter-drawer .smart-snap-section { margin-top: 10px; }
+.common-tools-parameter-drawer .smart-snap-distance { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 6px; }
+.common-tools-parameter-drawer .smart-snap-distance button { min-width: 0; }
+.common-tools-parameter-drawer .smart-snap-types { margin-top: 6px; }
+@media (max-width: 360px) {
+  .common-tools-parameter-drawer .file-slim-actions {
+    grid-template-columns: 1fr;
+  }
+}

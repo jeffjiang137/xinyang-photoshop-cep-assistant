@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>鑫洋助理</title>
+<style>
+      html, body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        background: #242424;
+        color: #f2f2f2;
+      }
+    </style>
+<script>
+      (function () {
+        var panel = "stitch-panel";
+        var background = true;
+        try {
+          var saved = localStorage.getItem("longStitch.activePanel");
+          if (/^(stitch|framework|spacing|text|guides|document|typography|tools|settings)-panel$/.test(saved || "")) panel = saved;
+          background = localStorage.getItem("longStitch.backgroundRunning") !== "0";
+        } catch (error) {}
+        document.documentElement.setAttribute("data-initial-panel", panel);
+        document.documentElement.setAttribute("data-runtime-booting", "1");
+        /* 尽可能在 CSS 和业务脚本解析前请求 Photoshop 保留 CEP 页面。 */
+        if (background && window.__adobe_cep__ && typeof window.__adobe_cep__.dispatchEvent === "function") {
+          try {
+            var extensionId = typeof window.__adobe_cep__.getExtensionId === "function"
+              ? window.__adobe_cep__.getExtensionId()
+              : "com.jeffjiang.ecommerce-design-assistant-cep.panel";
+            window.__adobe_cep__.dispatchEvent({
+              type: "com.adobe.PhotoshopPersistent",
+              scope: "APPLICATION",
+              appId: "PHXS",
+              extensionId: extensionId,
+              data: ""
+            });
+          } catch (ignorePersistenceBootstrap) {}
+        }
+      }());
+    </script>
+<link href="css/styles.css?v=2.2.05" rel="stylesheet"/>
+<link href="css/tools.css?v=2.2.05" rel="stylesheet"/>
+<link href="css/common-tools-grid.css?v=2.2.40" rel="stylesheet"/>
+<link href="css/framework.css?v=2.2.05" rel="stylesheet"/>
+<link href="css/ui-refresh.css?v=2.2.05" rel="stylesheet"/>
+<link href="css/ui-polish.css?v=2.2.05" rel="stylesheet"/>
+</head>
+<body>
+<main class="app-shell">
+<nav aria-label="一级功能导航" class="panel-nav">
+<button aria-label="拼图" aria-selected="false" class="nav-button" data-panel="stitch-panel" type="button">
+<img alt="" aria-hidden="true" class="nav-main-icon" src="assets/icons/navigation/stitch.svg"/>
+<span class="nav-label">拼图</span>
+</button>
+<button aria-label="自定义框架" aria-selected="false" class="nav-button" data-panel="framework-panel" type="button">
+<img alt="" aria-hidden="true" class="nav-main-icon" src="assets/icons/navigation/framework.svg"/>
+<span class="nav-label">框架</span>
+</button>
+<button aria-label="间距" aria-selected="false" class="nav-button" data-panel="spacing-panel" type="button">
+<img alt="" aria-hidden="true" class="nav-main-icon" src="assets/icons/navigation/spacing.svg"/>
+<span class="nav-label">间距</span>
+</button>
+<button aria-label="改字" aria-selected="false" class="nav-button" data-panel="text-panel" type="button">
+<img alt="" aria-hidden="true" class="nav-main-icon" src="assets/icons/navigation/text.svg"/>
+<span class="nav-label">改字</span>
+</button>
+<button aria-label="参考线" aria-selected="false" class="nav-button" data-panel="guides-panel" type="button">
+<img alt="" aria-hidden="true" class="nav-main-icon" src="assets/icons/navigation/guides.svg"/>
+<span class="nav-label">参考线</span>
+</button>
+<button aria-label="文档预设" aria-selected="false" class="nav-button" data-panel="document-panel" type="button"><img alt="" aria-hidden="true" class="nav-main-icon" src="assets/icons/navigation/document.svg"/><span class="nav-label">文档</span></button><button aria-label="文字排版" aria-selected="false" class="nav-button" data-panel="typography-panel" type="button"><img alt="" aria-hidden="true" class="nav-main-icon" src="assets/icons/navigation/typography.svg"/><span class="nav-label">文字</span></button><button aria-label="工具" aria-selected="false" class="nav-button" data-panel="tools-panel" type="button">
+<img alt="" aria-hidden="true" class="nav-main-icon" src="assets/icons/navigation/tools.svg"/>
+<span class="nav-label">工具</span>
+</button>
+<button aria-label="设置" aria-selected="false" class="nav-button nav-settings" data-panel="settings-panel" type="button">
+<img alt="" aria-hidden="true" class="nav-main-icon" src="assets/icons/navigation/settings.svg"/>
+<span class="nav-label">设置</span>
+</button>
+</nav>
+<div class="app-main">
+<section class="content">
+<section aria-label="拼图面板" class="tool-panel" id="stitch-panel">
+<div class="ui-page-header"><div class="ui-page-heading"><strong>拼图</strong><span>批量导入、分层拼接与智能切片</span></div></div>
+<div aria-label="长图宽度" class="width-selector">
+<span class="width-label">画布宽度</span>
+<div aria-label="选择拼接宽度" class="width-buttons" role="group">
+<button aria-pressed="true" class="width-button active" data-width="790" type="button">
+                790
+              </button>
+<button aria-pressed="false" class="width-button" data-width="1920" type="button">
+                1920
+              </button>
+</div>
+</div>
+<div aria-label="拖放或选择多张图片" class="drop-zone" id="drop-zone" role="button" tabindex="0">
+<div aria-hidden="true" class="drop-icon">＋</div>
+<div class="drop-title">拖放多张图片到这里</div>
+<div class="drop-subtitle">松开后自动排序并匹配画布宽度</div>
+<button class="button secondary" id="pick-files" type="button">选择图片</button>
+</div>
+<div class="list-header">
+<div>
+<strong>待拼接图片</strong>
+<span class="muted" id="file-count">0 张</span>
+</div>
+<button class="text-button" disabled="" id="clear-files" type="button">清空</button>
+</div>
+<div class="file-list empty" id="file-list">
+            支持 JPG、PNG、WEBP、PSD、PSB、TIF、BMP
+          </div>
+<button class="button primary full" disabled="" id="create-stitch" type="button">
+            创建 790px 分层长图
+          </button>
+<button class="button secondary full" id="create-slices" type="button">
+            智能切片
+          </button>
+<p class="hint">
+            使用“存储为 Web 所用格式”压缩导出 JPG；有切片时逐切片导出，无切片时导出画布，画板文档逐画板导出。
+          </p>
+<button class="button secondary full" id="export-slices" type="button">
+            导出切片
+          </button>
+</section>
+<section aria-label="自定义框架面板" class="tool-panel framework-panel" id="framework-panel">
+<div class="ui-page-header"><div class="ui-page-heading"><strong>自定义框架</strong><span>按表达式快速生成规则版式</span></div></div>
+<div class="framework-page">
+<div class="framework-page-tab"><button class="active" type="button">自定义框架</button></div>
+<div class="framework-scroll">
+<div aria-label="框架形状" class="framework-top-tabs" role="tablist">
+<button aria-selected="true" class="active" data-frame-type="0" type="button">矩形</button>
+<button aria-selected="false" data-frame-type="1" type="button">圆形</button>
+<button aria-selected="false" data-frame-type="2" type="button">方形</button>
+</div>
+<div class="framework-space">
+<div class="framework-field-row framework-field-row-two">
+<label class="framework-input-component">
+<span class="framework-input-left"><img alt="" src="assets/icons/framework/frame_row_space.svg"/></span>
+<input id="framework-row-space" placeholder="行间距 8" spellcheck="false" type="text"/>
+</label>
+<label class="framework-input-component">
+<span class="framework-input-left"><img alt="" src="assets/icons/framework/frame_col_space.svg"/></span>
+<input id="framework-col-space" placeholder="列间距 8" spellcheck="false" type="text"/>
+</label>
+</div>
+<div aria-label="逐行框架表达式" class="framework-lines" id="framework-lines"></div>
+<div class="framework-field-row framework-field-row-two framework-title-size-row">
+<label class="framework-input-component">
+<span class="framework-input-left"><img alt="" src="assets/icons/framework/frame_t1.svg"/></span>
+<input id="framework-t1" placeholder="主标题字号" spellcheck="false" type="text"/>
+</label>
+<label class="framework-input-component">
+<span class="framework-input-left"><img alt="" src="assets/icons/framework/frame_t2.svg"/></span>
+<input id="framework-t2" placeholder="副标题字号" spellcheck="false" type="text"/>
+</label>
+</div>
+<div aria-label="标题位置" class="framework-text-type" role="radiogroup">
+<button aria-checked="true" class="active" data-frame-title-style="1" title="框架下方左对齐" type="button"><img alt="" src="assets/icons/framework/frame_text_1.svg"/></button>
+<button aria-checked="false" data-frame-title-style="2" title="框架下方居中" type="button"><img alt="" src="assets/icons/framework/frame_text_2.svg"/></button>
+<button aria-checked="false" data-frame-title-style="3" title="框架下方右对齐" type="button"><img alt="" src="assets/icons/framework/frame_text_3.svg"/></button>
+<button aria-checked="false" data-frame-title-style="4" title="框架内部底部左对齐" type="button"><img alt="" src="assets/icons/framework/frame_text_4.svg"/></button>
+<button aria-checked="false" data-frame-title-style="5" title="框架内部底部居中" type="button"><img alt="" src="assets/icons/framework/frame_text_5.svg"/></button>
+<button aria-checked="false" data-frame-title-style="6" title="框架内部底部右对齐" type="button"><img alt="" src="assets/icons/framework/frame_text_6.svg"/></button>
+<button aria-checked="false" data-frame-title-style="7" title="框架内部中部左对齐" type="button"><img alt="" src="assets/icons/framework/frame_text_7.svg"/></button>
+<button aria-checked="false" data-frame-title-style="8" title="框架内部中部居中" type="button"><img alt="" src="assets/icons/framework/frame_text_8.svg"/></button>
+<button aria-checked="false" data-frame-title-style="9" title="框架内部中部右对齐" type="button"><img alt="" src="assets/icons/framework/frame_text_9.svg"/></button>
+<span aria-hidden="true" class="framework-text-placeholder"></span><span aria-hidden="true" class="framework-text-placeholder"></span><span aria-hidden="true" class="framework-text-placeholder"></span>
+</div>
+</div>
+<div class="framework-button-group">
+<div class="framework-bottom"><button disabled id="framework-create" type="button">生成框架</button></div>
+<div class="framework-bottom framework-bottom-submit"><button class="is-active" id="framework-merge" type="button">合并选中矩形</button></div>
+<button class="framework-reset" id="framework-reset" type="button">重置参数</button>
+</div>
+<div class="framework-helper">
+<button aria-expanded="false" class="framework-helper-title" id="framework-helper-toggle" type="button">
+<span>表达式使用说明</span><img alt="" src="assets/icons/framework/arrow_right.svg"/>
+</button>
+<div class="framework-helper-body" hidden id="framework-helper-body">
+<div class="framework-helper-row"><b>1</b><code>3</code><span>表示平均分为 3 块</span></div>
+<div class="framework-helper-row"><b>2</b><code>1:3:1</code><span>表示按照比例生成 3 块</span></div>
+<div class="framework-helper-row"><b>3</b><code>3=1&gt;2</code><span>表示生成 3 块，第 1 块比例为 3，其它比例为 1</span></div>
+<div class="framework-helper-row"><b>4</b><code>3=1%50</code><span>表示生成 3 块，第 1 块占比 50%，其它平分 50%</span></div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section aria-labelledby="spacing-title" class="tool-panel spacing-panel" id="spacing-panel">
+<div class="panel-title-row">
+<div>
+<strong id="spacing-title">选中图层间距</strong>
+<span>调整边距并自动重排全部图层</span>
+</div>
+<button class="text-button spacing-reset" id="reset-spacing-values" title="将三个数值恢复为 0" type="button">
+              一键清零
+            </button>
+</div>
+<div class="spacing-fields">
+<label>
+<span class="spacing-scrubber" data-input="side-margin" title="按住并左右拖拽修改数值">左右边距</span>
+<input aria-label="左右边距" id="side-margin" inputmode="numeric" step="1" type="number" value="0"/>
+</label>
+<label>
+<span class="spacing-scrubber" data-input="top-spacing" title="按住并左右拖拽修改数值">上间距</span>
+<input aria-label="上间距" id="top-spacing" inputmode="numeric" step="1" type="number" value="0"/>
+</label>
+<label>
+<span class="spacing-scrubber" data-input="bottom-spacing" title="按住并左右拖拽修改数值">下间距</span>
+<input aria-label="下间距" id="bottom-spacing" inputmode="numeric" step="1" type="number" value="0"/>
+</label>
+</div>
+<button class="button spacing-apply full" id="apply-spacing" type="button">
+            确认应用
+          </button>
+<p class="hint spacing-hint">
+            在 Photoshop 图层面板只选择一个内容。左右边距支持正负数；上/下间距为负数时会让相邻拼图向内重叠。
+          </p>
+</section>
+<section aria-labelledby="text-title" class="tool-panel text-panel" id="text-panel">
+<div class="panel-title-row">
+<div>
+<strong id="text-title">图片文字转可编辑图层</strong>
+<span>优先识别当前选区，无选区时识别选中图片</span>
+</div>
+</div>
+<div class="text-step-card">
+<div class="text-step-head"><span class="text-step-index">1</span><span>识别并生成可编辑文字</span></div>
+<div class="text-options">
+<label class="field-row" for="text-font-mode">
+<span>字体类型</span>
+<select id="text-font-mode">
+<option value="auto">自动（黑体优先）</option>
+<option value="sans">黑体（思源黑体优先）</option>
+<option value="serif">宋体（思源宋体优先）</option>
+</select>
+</label>
+</div>
+<button class="button primary full" id="recognize-text" type="button">
+            识别文字图层
+          </button>
+</div>
+<div class="text-step-card">
+<div class="text-step-head"><span class="text-step-index">2</span><span>擦除图片中的原文字</span></div>
+<div class="erase-controls">
+<label class="field-row erase-mode-row" for="erase-text-mode">
+<span>擦除方式</span>
+<select id="erase-text-mode">
+<option value="lama">LaMa / IOPaint 擦除</option>
+<option value="horizontal">横向拉伸擦除</option>
+<option value="vertical">纵向拉伸擦除</option>
+<option value="solidFill">背景纯色填充（3px 柔边）</option>
+<option value="contentAware">PS 内容识别填充</option>
+</select>
+</label>
+<button class="button secondary full" disabled="" id="erase-original-text" type="button">
+              擦除原文字
+            </button>
+</div>
+</div>
+<p class="hint text-hint">
+            框选文字区域后识别；无选区时识别当前图片。识别后双击文字图层修改，选中文字层可擦除原字，Ctrl+Z 撤回。
+          </p>
+</section>
+<section aria-label="参考线面板" class="tool-panel guides-panel" id="guides-panel">
+<iframe class="guide-page-frame" data-src="guide-native/index.html?v=2.2.05" id="guide-page-frame" src="about:blank" title="参考线"></iframe>
+</section>
+<section aria-label="文档预设面板" class="tool-panel document-panel" id="document-panel">
+<div class="ui-page-header"><div class="ui-page-heading"><strong>文档预设</strong><span>常用电商尺寸与安全参考线</span></div></div>
+<div class="page-intro document-intro">
+<strong>选择常用尺寸即可新建文档</strong>
+<span>预设会自动设置画布、分辨率和对应安全参考线；下方可展开自定义尺寸。</span>
+</div>
+<div class="preset-list" id="document-preset-list"></div>
+<details class="custom-preset-box">
+<summary>自定义文档</summary>
+<div class="tool-form two-columns">
+<label><span>名称</span><input id="custom-doc-name" type="text" value="自定义文档"/></label>
+<label><span>背景</span><select id="custom-doc-background"><option value="white">白色</option><option value="transparent">透明</option></select></label>
+<label><span>宽度 px</span><input id="custom-doc-width" min="1" type="number" value="790"/></label>
+<label><span>高度 px</span><input id="custom-doc-height" min="1" type="number" value="1404"/></label>
+<label><span>左右安全边距</span><input id="custom-doc-safe" max="49" min="0" type="number" value="3"/></label>
+<label><span>分辨率</span><input id="custom-doc-dpi" min="1" type="number" value="72"/></label>
+</div>
+<button class="button primary full" id="custom-doc-create" type="button">创建自定义文档</button>
+</details>
+</section><section aria-label="文字面板" class="tool-panel typography-panel" id="typography-panel">
+<div class="tuniu-words-panel">
+  <div class="words-panel-header">
+    <div class="ui-page-heading"><strong>文字面板</strong><span>字体、字符样式与自动排版</span></div>
+    <div class="words-header-actions">
+      <button aria-label="识别当前选中文字图层属性" class="words-header-icon words-read-style-button" id="words-read-current-style" title="识别当前选中文字图层属性" type="button">
+        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 8V5h3M16 5h3v3M19 16v3h-3M8 19H5v-3"/><path d="M8.2 16 12 7.5 15.8 16M9.6 13h4.8"/></svg>
+      </button>
+      <button aria-label="文字面板设置" aria-pressed="false" class="words-header-icon" id="words-settings-toggle" title="文字面板设置" type="button">
+        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 8.2A3.8 3.8 0 1 0 12 15.8 3.8 3.8 0 0 0 12 8.2Zm8.2 4.9v-2.2l-2-.7a7 7 0 0 0-.7-1.7l.9-1.9-1.6-1.6-1.9.9a7 7 0 0 0-1.7-.7l-.7-2h-2.2l-.7 2a7 7 0 0 0-1.7.7L6 5 4.4 6.6l.9 1.9a7 7 0 0 0-.7 1.7l-2 .7v2.2l2 .7a7 7 0 0 0 .7 1.7l-.9 1.9L6 19l1.9-.9a7 7 0 0 0 1.7.7l.7 2h2.2l.7-2a7 7 0 0 0 1.7-.7l1.9.9 1.6-1.6-.9-1.9a7 7 0 0 0 .7-1.7l2-.7Z"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="words-view words-main-view" id="words-main-view">
+
+    <div class="words-body-section">
+      <div class="words-font-color-row">
+        <div class="text-font-combobox words-font-combobox" id="tool-font-combobox">
+          <input aria-label="搜索字体" autocomplete="off" id="tool-font-search" placeholder="选择字体" spellcheck="false" type="text"/>
+          <button aria-label="展开字体列表" aria-controls="tool-font-results" aria-expanded="false" class="text-font-arrow words-disclosure" id="tool-load-fonts" title="读取并展开 Photoshop 字体" type="button"><svg aria-hidden="true" class="words-chevron-icon" viewBox="0 0 12 12"><path d="M2.1 4.1 6 8l3.9-3.9"/></svg></button>
+          <div class="text-font-results words-font-results" id="tool-font-results" role="listbox">
+            <div class="words-font-tabs" id="words-font-tabs">
+              <button class="active" data-font-filter="all" type="button">全部</button>
+              <button data-font-filter="recent" type="button">最近</button>
+              <button aria-controls="words-font-category" aria-expanded="false" class="words-category-toggle" data-font-filter="category" type="button"><span>分类</span><svg aria-hidden="true" class="words-chevron-icon" viewBox="0 0 12 12"><path d="M2.1 4.1 6 8l3.9-3.9"/></svg></button>
+            </div>
+            <div class="words-font-category" hidden id="words-font-category">
+              <button data-font-category="sans" type="button">黑体</button>
+              <button data-font-category="serif" type="button">宋体</button>
+              <button data-font-category="script" type="button">书写</button>
+              <button data-font-category="latin" type="button">西文</button>
+            </div>
+            <div id="words-font-result-list"></div>
+          </div>
+        </div>
+        <label class="words-color-control words-color-compact" title="调用 Photoshop 自带拾色器"><span>颜色</span><button aria-label="打开 Photoshop 拾色器" class="words-ps-color-picker" id="tool-text-color-picker" title="打开 Photoshop 自带拾色器，可在画布中吸取颜色" type="button"><i aria-hidden="true" id="tool-text-color-swatch"></i></button><input id="tool-text-color" type="hidden" value="#ffffff"/></label>
+      </div>
+      <input id="tool-font-input" type="hidden" value=""/>
+      <select aria-label="字体系列" hidden id="tool-font-family"><option value="">读取字体后选择</option></select>
+      <select aria-label="字体字重" hidden id="tool-font-style"><option value="">选择字重</option></select>
+      <span hidden id="tool-current-font-name"></span>
+      <div aria-label="当前字体字重快捷选择" class="words-weight-chips" id="font-style-chips"></div>
+
+      <div aria-label="文字样式与段落对齐" class="words-public-tools">
+        <button data-text-toggle="fauxBold" title="仿粗体" type="button"><strong>T</strong></button>
+        <button data-text-toggle="fauxItalic" title="仿斜体" type="button"><em>T</em></button>
+        <button data-text-toggle="allCaps" title="全大写" type="button"><span class="caps-icon">TT</span></button>
+        <span class="words-tool-separator"></span>
+        <button aria-label="左对齐" data-text-align="left" title="左对齐" type="button"><svg viewBox="0 0 20 20"><path d="M3 4h14M3 8h9M3 12h13M3 16h10"/></svg></button>
+        <button aria-label="居中对齐" data-text-align="center" title="居中对齐" type="button"><svg viewBox="0 0 20 20"><path d="M3 4h14M5.5 8h9M3.5 12h13M5 16h10"/></svg></button>
+        <button aria-label="右对齐" data-text-align="right" title="右对齐" type="button"><svg viewBox="0 0 20 20"><path d="M3 4h14M8 8h9M4 12h13M7 16h10"/></svg></button>
+      </div>
+      <select hidden id="tool-text-align"><option value="left">左对齐</option><option value="center">居中</option><option value="right">右对齐</option></select>
+
+      <div class="words-metric-row">
+        <div class="words-metric-control"><span class="words-metric-icon">T↕</span><input id="tool-font-size" min="1" max="1296" step="1" type="number" value="48"/><small id="words-size-unit">点</small><button aria-controls="words-font-size-popup" aria-expanded="false" class="words-disclosure" data-preset-toggle="font-size" type="button"><svg aria-hidden="true" class="words-chevron-icon" viewBox="0 0 12 12"><path d="M2.1 4.1 6 8l3.9-3.9"/></svg></button><div class="words-preset-popup" hidden id="words-font-size-popup"></div></div>
+        <div class="words-metric-control"><span class="words-metric-icon">A↕</span><input id="tool-leading" min="1" max="5000" step="1" type="number" value="58"/><small id="words-leading-unit">点</small><button aria-controls="words-line-space-popup" aria-expanded="false" class="words-disclosure" data-preset-toggle="line-space" type="button"><svg aria-hidden="true" class="words-chevron-icon" viewBox="0 0 12 12"><path d="M2.1 4.1 6 8l3.9-3.9"/></svg></button><div class="words-preset-popup" hidden id="words-line-space-popup"></div></div>
+      </div>
+      <div class="words-metric-row">
+        <div class="words-metric-control"><span class="words-metric-icon">VA↔</span><input id="tool-tracking" min="-1000" max="10000" step="1" type="number" value="0"/><button aria-controls="words-word-space-popup" aria-expanded="false" class="words-disclosure" data-preset-toggle="word-space" type="button"><svg aria-hidden="true" class="words-chevron-icon" viewBox="0 0 12 12"><path d="M2.1 4.1 6 8l3.9-3.9"/></svg></button><div class="words-preset-popup" hidden id="words-word-space-popup"></div></div>
+        <label class="words-optical-kern" title="光学字距：Photoshop 根据字符轮廓自动微调相邻字符间距；关闭时使用字体自带的度量字距"><input id="words-optical-kern" type="checkbox"/> 光学字距</label>
+      </div>
+
+      <div class="words-action-toolbar">
+        <button id="words-translate-button" title="翻译（右键展开设置）" type="button"><span>译</span></button>
+        <button id="words-structure-toggle" title="文本拆分/合并" type="button"><span>拆</span></button>
+        <button id="tool-text-generate-button" title="生成按钮（右键展开设置）" type="button"><span>▣</span></button>
+        <span class="words-tool-separator"></span>
+        <button id="tool-text-copy-style" title="复制文字属性" type="button"><span>⇧A</span></button>
+        <button id="tool-text-paste-style" title="粘贴文字属性" type="button"><span>⇩A</span></button>
+        <button id="words-text-direction" title="文字方向" type="button"><span>↕T</span></button>
+      </div>
+
+      <div class="words-inline-popover" hidden id="words-translate-panel">
+        <div class="words-language-row"><div class="words-select-wrap"><select id="words-translate-from"><option value="auto">自动检测</option><option value="zh">简体中文</option><option value="cht">繁体中文</option><option value="en">英语</option><option value="jp">日语</option><option value="kor">韩语</option><option value="fra">法语</option><option value="de">德语</option><option value="spa">西班牙语</option><option value="it">意大利语</option><option value="ru">俄语</option><option value="vie">越南语</option><option value="th">泰语</option></select><svg aria-hidden="true" class="words-chevron-icon" viewBox="0 0 12 12"><path d="M2.1 4.1 6 8l3.9-3.9"/></svg></div><button id="words-switch-language" type="button">⇄</button><div class="words-select-wrap"><select id="words-translate-to"><option value="en">英语</option><option value="zh">简体中文</option><option value="cht">繁体中文</option><option value="jp">日语</option><option value="kor">韩语</option><option value="fra">法语</option><option value="de">德语</option><option value="spa">西班牙语</option><option value="it">意大利语</option><option value="ru">俄语</option><option value="vie">越南语</option><option value="th">泰语</option></select><svg aria-hidden="true" class="words-chevron-icon" viewBox="0 0 12 12"><path d="M2.1 4.1 6 8l3.9-3.9"/></svg></div></div>
+        <label><input checked id="words-translate-replace" type="checkbox"/> 自动替换原文</label>
+        <button class="words-popover-primary" id="words-translate-run" type="button">翻译</button>
+      </div>
+
+      <div class="words-inline-popover words-structure-panel" hidden id="words-structure-panel">
+        <button data-text-structure="splitLines" title="将多行文本拆分为单行独立图层" type="button">拆开多行</button>
+        <button data-text-structure="splitChars" title="按空格拆分词组；含标点的整行文字保持完整" type="button">词组拆开</button>
+        <button data-text-structure="mergeLines" title="将多个文本合并至一个文本图层" type="button">合并多行</button>
+        <button data-text-structure="mergeParagraph" title="将多个文本合并为段落文本" type="button">合并成段落</button>
+      </div>
+
+      <div class="words-inline-popover words-button-panel" hidden id="text-button-settings-panel">
+        <div class="words-button-options"><label><input id="text-button-border" type="checkbox"/> 线性</label><label><input checked name="text-button-corner" type="radio" value="0"/> 圆角</label><label><input name="text-button-corner" type="radio" value="1"/> 直角</label></div>
+        <label class="words-padding-input"><span>自定义内边距</span><input id="text-button-padding-rule" type="text" value="28,12"/><button aria-controls="words-padding-history" aria-expanded="false" class="words-disclosure" id="words-padding-history-toggle" type="button"><svg aria-hidden="true" class="words-chevron-icon" viewBox="0 0 12 12"><path d="M2.1 4.1 6 8l3.9-3.9"/></svg></button></label>
+        <div class="words-padding-history" hidden id="words-padding-history"><button data-padding-rule="10,5" type="button">10,5</button><button data-padding-rule="28,12" type="button">28,12</button><button data-padding-rule="15=3:1" type="button">15=3:1</button></div>
+        <div class="words-auto-padding-buttons"><button data-auto-padding="1" type="button">1</button><button data-auto-padding="2" type="button">2</button><button data-auto-padding="3" type="button">3</button><button data-auto-padding="4" type="button">4</button><button data-auto-padding="5" type="button">5</button><button data-auto-padding="6" type="button">6</button><button data-auto-padding="7" type="button">7</button><button data-auto-padding="8" type="button">8</button></div>
+        <input id="text-button-color" type="hidden" value="#e53935"/>
+        <input id="text-button-padding-x" type="hidden" value="24"/>
+        <input id="text-button-padding-y" type="hidden" value="12"/>
+        <input id="text-button-radius" type="hidden" value="9999"/>
+        <input id="text-button-group" type="hidden"/>
+      </div>
+    </div>
+
+    <div class="words-divider"></div>
+
+    <div aria-label="文字图层对齐与分布" class="words-align-grid">
+      <button data-words-align="left" title="左对齐" type="button"><svg viewBox="0 0 24 20"><path d="M3 2v16M6 5h13M6 10h9M6 15h11"/></svg></button>
+      <button data-words-align="hCenter" title="居中对齐" type="button"><svg viewBox="0 0 24 20"><path d="M12 2v16M5 5h14M7 10h10M6 15h12"/></svg></button>
+      <button data-words-align="right" title="右对齐" type="button"><svg viewBox="0 0 24 20"><path d="M21 2v16M5 5h13M9 10h9M7 15h11"/></svg></button>
+      <button data-words-distribute="horizontal" title="水平分布" type="button"><svg viewBox="0 0 24 20"><path d="M3 3v14M21 3v14M7 6h3v8H7zM14 6h3v8h-3z"/></svg></button>
+      <button data-words-canvas="horizontal" title="居中对齐画布" type="button"><svg viewBox="0 0 24 20"><path d="M12 2v16M3 5h6v10H3zM15 5h6v10h-6z"/></svg></button>
+      <button data-words-gap-toggle="vertical" title="垂直间距分布" type="button"><svg viewBox="0 0 24 20"><path d="M4 3h16M4 17h16M7 6h10v3H7zM7 11h10v3H7z"/></svg></button>
+      <button data-words-align="top" title="顶对齐" type="button"><svg viewBox="0 0 24 20"><path d="M3 3h18M6 6v10h4V6M14 6v7h4V6"/></svg></button>
+      <button data-words-align="vCenter" title="水平居中" type="button"><svg viewBox="0 0 24 20"><path d="M3 10h18M6 4v12h4V4M14 6v8h4V6"/></svg></button>
+      <button data-words-align="bottom" title="底对齐" type="button"><svg viewBox="0 0 24 20"><path d="M3 17h18M6 4v10h4V4M14 7v7h4V7"/></svg></button>
+      <button data-words-distribute="vertical" title="垂直分布" type="button"><svg viewBox="0 0 24 20"><path d="M4 2h16M4 18h16M7 5h10v3H7zM7 12h10v3H7z"/></svg></button>
+      <button data-words-canvas="vertical" title="居中对齐画布" type="button"><svg viewBox="0 0 24 20"><path d="M3 10h18M5 3h6v5H5zM13 12h6v5h-6z"/></svg></button>
+      <button data-words-gap-toggle="horizontal" title="水平间距分布" type="button"><svg viewBox="0 0 24 20"><path d="M3 3v14M21 3v14M6 6h3v8H6zM11 6h3v8h-3zM16 6h3v8h-3z"/></svg></button>
+    </div>
+    <div class="words-gap-panel" hidden id="words-gap-panel"><strong id="words-gap-title">分布元素</strong><input id="words-gap-expression" placeholder="10, 20, 30 或 30=1:2:1" type="text"/><button id="words-gap-run" type="button">应用</button><small>固定间距：10,20,30　比例间距：30=1:2:1</small></div>
+
+    <div class="words-divider"></div>
+
+    <div class="words-hierarchy" id="words-hierarchy-section">
+      <div class="words-hierarchy-head"><div class="words-select-wrap"><select id="text-preset-select"><option value="regular">常规</option><option value="mobile">手机端</option><option value="arithmetic">等差</option><option value="contrast">强对比</option></select><svg aria-hidden="true" class="words-chevron-icon" viewBox="0 0 12 12"><path d="M2.1 4.1 6 8l3.9-3.9"/></svg></div><button id="words-edit-hierarchy" title="编辑字号层级" type="button">•••</button></div>
+      <div class="value-chips words-size-hierarchy" id="font-size-chips"></div>
+      <div class="words-hierarchy-editor" hidden id="words-hierarchy-editor"><div id="words-hierarchy-inputs"></div><div><button id="words-save-hierarchy" type="button">保存到预设</button><button id="words-new-hierarchy" type="button">新建预设</button></div></div>
+    </div>
+
+    <div class="words-divider"></div>
+
+    <button aria-controls="words-auto-layout-panel" aria-expanded="false" class="words-auto-layout-toggle words-disclosure" id="words-auto-layout-toggle" type="button"><span>一键自动排版</span><svg aria-hidden="true" class="words-chevron-icon" viewBox="0 0 12 12"><path d="M2.1 4.1 6 8l3.9-3.9"/></svg></button>
+    <div class="words-auto-layout-panel" hidden id="words-auto-layout-panel">
+      <div class="words-auto-layout-row"><label><span>场景</span><div class="words-select-wrap"><select id="words-layout-scene"><option value="0">海报</option><option value="1">分类</option><option value="2">标题</option><option value="3">正文</option></select><svg aria-hidden="true" class="words-chevron-icon" viewBox="0 0 12 12"><path d="M2.1 4.1 6 8l3.9-3.9"/></svg></div></label><label><span>对齐</span><div class="words-select-wrap"><select id="words-layout-align"><option value="left">左对齐</option><option value="center">中对齐</option><option value="right">右对齐</option></select><svg aria-hidden="true" class="words-chevron-icon" viewBox="0 0 12 12"><path d="M2.1 4.1 6 8l3.9-3.9"/></svg></div></label></div>
+      <div class="words-layout-mode-buttons"><button class="active" data-layout-mode="0" type="button">常规</button><button data-layout-mode="1" type="button">强烈</button><button data-layout-mode="2" type="button">接近</button><button data-layout-mode="3" type="button">相同</button></div>
+      <div class="words-auto-layout-row"><label><span>间隔基数</span><input id="words-layout-base-gap" type="number" value="40"/></label><label class="words-auto-gap"><input checked id="words-layout-auto-gap" type="checkbox"/> 自动计算间隔</label></div>
+      <label class="words-layout-ratio"><span>间隔比例</span><input id="words-layout-gap-ratio" type="text" value="0.8:1.5"/><button aria-controls="words-layout-ratio-list" aria-expanded="false" class="words-disclosure" id="words-layout-ratio-toggle" type="button"><svg aria-hidden="true" class="words-chevron-icon" viewBox="0 0 12 12"><path d="M2.1 4.1 6 8l3.9-3.9"/></svg></button></label>
+      <div class="words-layout-ratio-list" hidden id="words-layout-ratio-list"></div>
+      <button class="words-layout-run" id="tool-text-auto-layout" type="button">应用自动排版</button>
+      <input id="auto-layout-sizes" type="hidden" value="92,48,36,24,15,12"/>
+      <input id="auto-layout-gap" type="hidden" value="12"/>
+      <select hidden id="auto-layout-align"><option value="left">左对齐</option><option value="center">居中</option><option value="right">右对齐</option></select>
+    </div>
+  </div>
+
+  <div class="words-view words-settings-view" hidden id="words-settings-view">
+    <label class="words-setting-toggle"><span>开启自定义层级</span><input checked id="words-show-hierarchy" type="checkbox"/></label>
+    <label class="words-setting-toggle"><span>开启一键排版</span><input checked id="words-show-auto-layout" type="checkbox"/></label>
+    <div class="words-setting-block"><div><strong>自定义字号菜单</strong><button data-reset-presets="fontSize" type="button">重置</button></div><textarea id="words-custom-font-size" rows="3">6,8,10,11,12,14,16,18,24,30,36,48,60,72,84,96,108,120</textarea></div>
+    <div class="words-setting-block"><div><strong>自定义行间距（字号倍数）</strong><button data-reset-presets="lineSpace" type="button">重置</button></div><textarea id="words-custom-line-space" rows="3">1,1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2,2.5</textarea></div>
+    <div class="words-setting-block"><div><strong>自定义字符间距</strong><button data-reset-presets="wordSpace" type="button">重置</button></div><textarea id="words-custom-word-space" rows="3">-100,-50,-25,0,25,50,75,100,200,300,500,1000</textarea></div>
+  </div>
+</div>
+</section><section aria-label="工具面板" class="tool-panel tools-panel" id="tools-panel">
+<div class="tools-view active" data-tools-view="common">
+<div class="common-tools-shell">
+<div class="common-tools-title"><div class="ui-page-heading"><strong>常用功能</strong><span>对齐、变换、批处理与导出</span></div></div>
+<div class="common-zooms">
+<div class="common-zoom-row">
+<div class="tuniu-z-input common-zoom-input" data-zoom-control="up">
+<button aria-label="按输入比例放大" class="tuniu-z-left" data-zoom-submit="up" title="按输入比例放大" type="button"><img alt="" src="assets/icons/framework/tool_zoomplus.svg"/></button>
+<div class="tuniu-z-center"><input autocomplete="off" id="common-scale-up-custom" placeholder="放大" spellcheck="false" title="支持 120%、1/2、0.5 或 120" type="text"/></div>
+<button aria-expanded="false" aria-label="展开更多放大比例" class="tuniu-z-right" data-zoom-drop="up" type="button"><img alt="" src="assets/icons/framework/arrow_down.svg"/></button>
+</div>
+<div class="common-zoom-buttons"><button data-common-scale="105" type="button">105</button><button data-common-scale="110" type="button">110</button><button data-common-scale="150" type="button">150</button><button data-common-scale="200" type="button">200</button></div>
+</div>
+<div class="common-zoom-items" data-zoom-extra="up" hidden><button data-common-scale="101" type="button">101</button><button data-common-scale="102" type="button">102</button><button data-common-scale="103" type="button">103</button><button data-common-scale="120" type="button">120</button><button data-common-scale="140" type="button">140</button><button data-common-scale="250" type="button">250</button><button data-common-scale="300" type="button">300</button><button data-common-scale="350" type="button">350</button><button data-common-scale="400" type="button">400</button><button data-common-scale="500" type="button">500</button></div>
+<div class="common-zoom-row common-zoom-row-in">
+<div class="tuniu-z-input common-zoom-input" data-zoom-control="down">
+<button aria-label="按输入比例缩小" class="tuniu-z-left" data-zoom-submit="down" title="按输入比例缩小" type="button"><img alt="" src="assets/icons/framework/tool_zoom_.svg"/></button>
+<div class="tuniu-z-center"><input autocomplete="off" id="common-scale-down-custom" placeholder="缩小" spellcheck="false" title="支持 90%、1/2、0.5 或 90" type="text"/></div>
+<button aria-expanded="false" aria-label="展开更多缩小比例" class="tuniu-z-right" data-zoom-drop="down" type="button"><img alt="" src="assets/icons/framework/arrow_down.svg"/></button>
+</div>
+<div class="common-zoom-buttons"><button data-common-scale="95" type="button">95</button><button data-common-scale="90" type="button">90</button><button data-common-scale="85" type="button">85</button><button data-common-scale="50" type="button">50</button></div>
+</div>
+<div class="common-zoom-items" data-zoom-extra="down" hidden><button data-common-scale="99" type="button">99</button><button data-common-scale="98" type="button">98</button><button data-common-scale="97" type="button">97</button><button data-common-scale="70" type="button">70</button><button data-common-scale="60" type="button">60</button><button data-common-scale="50" type="button">50</button><button data-common-scale="33" type="button">33</button><button data-common-scale="25" type="button">25</button><button data-common-scale="20" type="button">20</button><button data-common-scale="10" type="button">10</button></div>
+</div>
+<div aria-label="图层对齐" class="common-align-row">
+<button data-common-align="left" title="左对齐" type="button"><img alt="" src="assets/icons/common-tools/align-left.svg"/></button>
+<button data-common-align="hCenter" title="水平居中" type="button"><img alt="" src="assets/icons/common-tools/align-hcenter.svg"/></button>
+<button data-common-align="right" title="右对齐" type="button"><img alt="" src="assets/icons/common-tools/align-right.svg"/></button>
+<button data-common-align="top" title="顶对齐" type="button"><img alt="" src="assets/icons/common-tools/align-top.svg"/></button>
+<button data-common-align="vCenter" title="垂直居中" type="button"><img alt="" src="assets/icons/common-tools/align-vcenter.svg"/></button>
+<button data-common-align="bottom" title="底对齐" type="button"><img alt="" src="assets/icons/common-tools/align-bottom.svg"/></button>
+</div>
+<div aria-label="画布居中与元素分布" class="common-layout-row">
+<button data-common-canvas-center="horizontal" title="基于画布水平居中" type="button"><img alt="" src="assets/icons/common-tools/canvas-center-horizontal.svg"/></button>
+<button data-common-canvas-center="vertical" title="基于画布垂直居中" type="button"><img alt="" src="assets/icons/common-tools/canvas-center-vertical.svg"/></button>
+<button data-common-even-distribute="horizontal" title="多选元素水平分布" type="button"><img alt="" src="assets/icons/common-tools/distribute-horizontal.svg"/></button>
+<button data-common-even-distribute="vertical" title="多选元素垂直分布" type="button"><img alt="" src="assets/icons/common-tools/distribute-vertical.svg"/></button>
+</div>
+<div aria-label="中心与边缘翻转" class="common-flip-row">
+<button data-common-flip="flipHorizontalCenter" title="左右中心翻转" type="button"><img alt="" src="assets/icons/common-tools/flip-center-horizontal.svg"/></button>
+<button data-common-flip="flipVerticalCenter" title="上下中心翻转" type="button"><img alt="" src="assets/icons/common-tools/flip-center-vertical.svg"/></button>
+<button data-common-flip="flipLeftEdge" title="沿左边缘翻转" type="button"><img alt="" src="assets/icons/common-tools/flip-edge-left.svg"/></button>
+<button data-common-flip="flipRightEdge" title="沿右边缘翻转" type="button"><img alt="" src="assets/icons/common-tools/flip-edge-right.svg"/></button>
+<button data-common-flip="flipBottomEdge" title="沿下边缘翻转" type="button"><img alt="" src="assets/icons/common-tools/flip-edge-bottom.svg"/></button>
+<button data-common-flip="flipTopEdge" title="沿上边缘翻转" type="button"><img alt="" src="assets/icons/common-tools/flip-edge-top.svg"/></button>
+</div>
+<div class="common-tools-grid" role="list">
+<div class="common-tool-item" role="listitem">
+<button class="common-tool-button" data-common-action="embed-one" title="嵌入图片" type="button">
+<span class="common-tool-icon"><img alt="" src="assets/icons/common-tools/import-one.svg"/></span>
+<span class="common-tool-label">嵌入图片</span>
+</button>
+<button aria-label="嵌入图片自动化设置" class="common-tool-more" data-common-more="embed-image" title="自动嵌入设置" type="button"><img alt="" src="assets/icons/common-tools/more.svg"/></button>
+</div>
+<div class="common-tool-item" role="listitem">
+<button class="common-tool-button" data-common-action="embed-many" title="多选图片图层和一个图层组，按顺序逐一剪切适配" type="button">
+<span class="common-tool-icon"><img alt="" src="assets/icons/common-tools/import-many.svg"/></span>
+<span class="common-tool-label">嵌入多图片</span>
+</button>
+</div>
+<div class="common-tool-item" role="listitem">
+<button class="common-tool-button" data-common-action="import-images" title="导入多图片" type="button">
+<span class="common-tool-icon"><img alt="" src="assets/icons/common-tools/import-files.svg"/></span>
+<span class="common-tool-label">导入多图片</span>
+</button>
+<button aria-label="导入多图片参数设置" class="common-tool-more" data-common-more="import-images" title="参数设置" type="button"><img alt="" src="assets/icons/common-tools/more.svg"/></button>
+</div>
+<div class="common-tool-item" role="listitem">
+<button class="common-tool-button" data-common-action="auto-fill" title="自动填充颜色" type="button">
+<span class="common-tool-icon"><img alt="" src="assets/icons/common-tools/fill-color.svg"/></span>
+<span class="common-tool-label">自动填充颜色</span>
+</button>
+<button aria-label="自动填充颜色参数设置" class="common-tool-more" data-common-more="auto-fill" title="参数设置" type="button"><img alt="" src="assets/icons/common-tools/more.svg"/></button>
+</div>
+<div class="common-tool-item" role="listitem">
+<button class="common-tool-button" data-common-action="fix-blur" title="修正模糊" type="button">
+<span class="common-tool-icon"><img alt="" src="assets/icons/common-tools/snap-pixels.svg"/></span>
+<span class="common-tool-label">修正模糊</span>
+</button>
+</div>
+<div class="common-tool-item" role="listitem">
+<button class="common-tool-button" data-common-action="swap-fill-stroke" title="填充线框互换" type="button">
+<span class="common-tool-icon"><img alt="" src="assets/icons/common-tools/swap-fill-stroke.svg"/></span>
+<span class="common-tool-label">填充线框互换</span>
+</button>
+</div>
+<div class="common-tool-item" role="listitem">
+<button class="common-tool-button" data-common-action="file-slim" title="文件瘦身" type="button">
+<span class="common-tool-icon"><img alt="" src="assets/icons/common-tools/file-slim.svg"/></span>
+<span class="common-tool-label">文件瘦身</span>
+</button>
+<button aria-label="文件瘦身参数设置" class="common-tool-more" data-common-more="file-slim" title="参数设置" type="button"><img alt="" src="assets/icons/common-tools/more.svg"/></button>
+</div>
+<div class="common-tool-item" role="listitem">
+<button class="common-tool-button" data-common-action="custom-transform" title="自定义变换" type="button">
+<span class="common-tool-icon"><img alt="" src="assets/icons/common-tools/custom-transform.svg"/></span>
+<span class="common-tool-label">自定义变换</span>
+</button>
+</div>
+<div class="common-tool-item" role="listitem">
+<button class="common-tool-button" data-common-action="export-image" title="导出图片" type="button">
+<span class="common-tool-icon"><img alt="" src="assets/icons/common-tools/export.svg"/></span>
+<span class="common-tool-label">导出图片</span>
+</button>
+<button aria-label="导出图片参数设置" class="common-tool-more" data-common-more="batch-export" title="参数设置" type="button"><img alt="" src="assets/icons/common-tools/more.svg"/></button>
+</div>
+<div class="common-tool-item" role="listitem">
+<button class="common-tool-button" data-common-action="distribute" title="按间距分布" type="button">
+<span class="common-tool-icon"><img alt="" src="assets/icons/common-tools/distribute.svg"/></span>
+<span class="common-tool-label">按间距分布</span>
+</button>
+</div>
+<div class="common-tool-item" role="listitem">
+<button class="common-tool-button" data-common-action="replace-elements" title="元素(组)替换" type="button">
+<span class="common-tool-icon"><img alt="" src="assets/icons/common-tools/replace.svg"/></span>
+<span class="common-tool-label">元素(组)替换</span>
+</button>
+</div>
+<div class="common-tool-item" role="listitem">
+<button class="common-tool-button" data-common-action="find-same" title="找相同" type="button">
+<span class="common-tool-icon"><img alt="" src="assets/icons/common-tools/find-same.svg"/></span>
+<span class="common-tool-label">找相同</span>
+</button>
+</div>
+<div class="common-tool-item" role="listitem">
+<button class="common-tool-button" data-common-action="swap-position" title="位置互换" type="button">
+<span class="common-tool-icon"><img alt="" src="assets/icons/common-tools/swap-position.svg"/></span>
+<span class="common-tool-label">位置互换</span>
+</button>
+</div>
+<div class="common-tool-item" role="listitem">
+<button class="common-tool-button" data-common-action="swap-colors" title="图层颜色互换" type="button">
+<span class="common-tool-icon"><img alt="" src="assets/icons/common-tools/swap-colors.svg"/></span>
+<span class="common-tool-label">图层颜色互换</span>
+</button>
+</div>
+<div class="common-tool-item" role="listitem">
+<button class="common-tool-button" data-common-action="image-text" title="图片转文字" type="button">
+<span class="common-tool-icon"><img alt="" src="assets/icons/common-tools/image-text.svg"/></span>
+<span class="common-tool-label">图片转文字</span>
+</button>
+</div>
+<div class="common-tool-item" role="listitem">
+<button class="common-tool-button" data-common-action="rectangle" title="矩形批量设置" type="button">
+<span class="common-tool-icon"><img alt="" src="assets/icons/common-tools/rectangle.svg"/></span>
+<span class="common-tool-label">矩形批量设置</span>
+</button>
+</div>
+<div class="common-tool-item" role="listitem">
+<button class="common-tool-button" data-common-action="pinyin" title="汉字转拼音" type="button">
+<span class="common-tool-icon"><img alt="" src="assets/icons/common-tools/pinyin.svg"/></span>
+<span class="common-tool-label">汉字转拼音</span>
+</button>
+</div>
+<div class="common-tool-item" role="listitem">
+<button aria-pressed="false" class="common-tool-button common-tool-snap" data-common-action="smart-snap" title="磁吸模式（Shift+S 开关；开启后点击可将当前图层吸附到最近目标）" type="button"><span aria-hidden="true" class="common-tool-icon common-tool-snap-icon">⌘</span><span class="common-tool-label">磁吸模式</span><span aria-hidden="true" class="common-tool-state"></span></button>
+<button aria-label="磁吸模式设置" class="common-tool-more" data-common-more="smart-snap" title="磁吸模式设置" type="button"><img alt="" src="assets/icons/common-tools/more.svg"/></button>
+</div>
+</div>
+</div>
+<div aria-hidden="true" class="common-tools-parameter-drawer drawer-collapsed" id="common-tools-parameter-drawer">
+<div class="tool-detail" data-tool-detail-view="smart-snap">
+<div class="tool-detail-title"><strong>磁吸模式</strong><span>Shift+S 开关；开启后点击按钮可吸附当前图层</span></div>
+<label class="single-check smart-snap-enabled"><input id="smart-snap-enabled" type="checkbox"/> 开启磁吸模式</label>
+<div class="smart-snap-section"><span class="field-title">吸附距离</span><div aria-label="吸附距离" class="tuniu-segmented smart-snap-distance" role="radiogroup"><button data-smart-snap-distance="10" type="button">10px</button><button data-smart-snap-distance="20" type="button">20px</button><button data-smart-snap-distance="30" type="button">30px</button><button data-smart-snap-distance="50" type="button">50px</button></div></div>
+<div class="smart-snap-section"><span class="field-title">吸附类型</span><div class="tuniu-check-list smart-snap-types"><label><input id="smart-snap-layer-edges" type="checkbox"/> 图层边缘</label><label><input id="smart-snap-centers" type="checkbox"/> 中心线</label><label><input id="smart-snap-equal-spacing" type="checkbox"/> 等距</label><label><input id="smart-snap-canvas-edges" type="checkbox"/> 画布边缘</label><label><input id="smart-snap-guides" type="checkbox"/> 参考线</label></div></div>
+<p class="hint compact-hint">CEP 无法介入 Photoshop 正在进行的鼠标拖拽；移动完成后点击“磁吸模式”即可按当前设置校正到最近目标。可使用 Shift+S 快速开启或关闭。</p>
+</div>
+<div class="tool-detail" data-tool-detail-view="embed-image">
+<div class="tool-detail-title"><strong>嵌入图片</strong><span>监听 Photoshop 插入与粘贴事件</span></div>
+<div class="check-grid embed-auto-options">
+<label><input id="embed-auto-place" type="checkbox"/> 插入图片自动嵌入图片</label>
+<label><input id="embed-auto-paste" type="checkbox"/> 粘贴图片自动嵌入图片</label>
+<label title="以当前选中图层透明区域建立选区，复制它视觉下方实际可见内容，并放到当前图层上方向下建立剪切蒙版"><input id="embed-lower-visual" type="checkbox"/> 嵌入下方图层</label>
+</div>
+<p class="hint compact-hint">三项模式互斥：勾选任一“自动嵌入”选项时会自动取消“嵌入下方图层”；勾选“嵌入下方图层”时会关闭两个自动嵌入选项。手动嵌入会按当前图层透明区域复制视觉下层内容并建立剪切蒙版。</p>
+</div>
+<div class="tool-detail active" data-tool-detail-view="import-images">
+<div class="tuniu-check-list">
+<label><input id="tuniu-import-linked" type="checkbox"/> 转换成链接智能对象</label>
+</div>
+</div>
+<div class="tool-detail" data-tool-detail-view="auto-fill">
+<div class="tuniu-check-list">
+<label><input checked id="tuniu-auto-fill-text" type="checkbox"/> 自动填充文字/文本图层</label>
+<label><input checked id="tuniu-auto-fill-shape" type="checkbox"/> 自动填充形状图层</label>
+<label><input checked id="tuniu-auto-fill-normal" type="checkbox"/> 自动填充普通/像素图层</label>
+</div>
+</div>
+<div class="tool-detail" data-tool-detail-view="file-slim">
+<div class="tool-detail-title"><strong>文件瘦身</strong><span>兼容图牛方法映射</span></div>
+<div class="tuniu-check-list file-slim-options">
+<label title="递归打开智能对象并清理 DocumentAncestors 元数据；图层较多时会比较耗时"><input checked="" id="slim-metadata" type="checkbox"/> 优化智能对象</label>
+<label><input checked="" id="slim-empty-layers" type="checkbox"/> 删除全部空图层</label>
+<label><input id="slim-hidden-layers" type="checkbox"/> 删除全部隐藏图层</label>
+</div>
+<div class="tuniu-two-buttons file-slim-actions">
+<button class="button primary" id="tool-slim-run" type="button">优化当前文档</button>
+<button class="button" id="tool-slim-batch" type="button">批量优化文档</button>
+</div>
+<p class="hint compact-hint">功能协议对应图牛的 commonTools.fileSlim、commonTools.getPsdFiles 和 commonTools.batchSlimFile。优化智能对象会递归处理嵌套智能对象；批量模式会保存选中的 PSD/PSB，请先备份重要文件。</p>
+</div>
+<div class="tool-detail" data-tool-detail-view="batch-export">
+<div class="tuniu-export-panel">
+<div class="tuniu-export-row top-row">
+<div class="tuniu-segmented" aria-label="导出格式"><button class="active" data-export-format="jpg" type="button">JPG</button><button data-export-format="png" type="button">PNG</button></div>
+<label class="quality-field"><span>品质</span><input id="tuniu-export-quality" max="100" min="1" type="number" value="100"/></label>
+<label class="png-mode-field" hidden><span>PNG模式</span><select id="tuniu-export-png-mode"><option value="24">PNG-24</option><option selected value="8">PNG-8</option></select></label>
+</div>
+<div class="tuniu-inline-row"><span class="field-title">保存到</span><input id="tuniu-export-path" placeholder="自定义目录" type="text"/><button class="mini-button" id="tuniu-export-pick-folder" type="button">选择</button></div>
+<div class="tuniu-radio-row export-path-types"><label><input checked name="tuniu-export-path-type" type="radio" value="desktop"/> 桌面</label><label><input name="tuniu-export-path-type" type="radio" value="originFilePath"/> 文件所在目录</label></div>
+<div class="tuniu-inline-row"><span class="field-title">文件名</span><input id="tuniu-export-file-name" placeholder="重命名" type="text"/></div>
+<div class="tuniu-radio-row"><label><input id="tuniu-export-layer-name" type="checkbox"/> 图层名</label><label><input id="tuniu-export-auto-number" type="checkbox"/> 自动编号</label></div>
+<div class="tuniu-radio-row stacked"><label><input checked name="tuniu-export-save-type" type="radio" value="0"/> 使用导出Web方式(支持切片)</label><label><input name="tuniu-export-save-type" type="radio" value="1"/> 使用另存为方式(不压缩)</label></div>
+<details><summary>压缩图片 &amp; 添加水印</summary><div class="tuniu-two-fields"><input id="tuniu-export-width" placeholder="导出宽度" type="number"/><input id="tuniu-export-height" placeholder="导出高度" type="number"/></div><div class="tuniu-inline-row no-title"><input id="tuniu-export-watermark" placeholder="选择水印文件" readonly type="text"/><button class="mini-button" id="tuniu-export-pick-watermark" type="button">选择</button></div><label class="single-check"><input id="tuniu-export-origin" type="checkbox"/> 同时导出原图</label></details>
+<details><summary>所在目录设置</summary><label class="single-check"><input id="tuniu-export-open-folder" type="checkbox"/> 保存后自动打开所在目录</label><button class="tuniu-wide-button" id="tuniu-export-open-current" type="button">打开所在目录</button></details>
+<details><summary>批量导出图片</summary><div class="tuniu-two-buttons"><button data-export-batch-level="topLevel" type="button">导出一级图层</button><button data-export-batch-level="secondLevel" type="button">导出二级图层</button></div><button class="tuniu-wide-button" id="tuniu-export-psd-folder" type="button">批量导出文件夹所有PSD</button></details>
+</div>
+</div>
+<div class="tool-detail" data-tool-detail-view="quick-transform">
+<div class="tuniu-transform-fields">
+<label><span>N</span><input id="tuniu-transform-count" placeholder="复制数量" type="number"/></label><label><span>↗</span><input id="tuniu-transform-scale" placeholder="缩放比例" type="number"/></label>
+<label><span>↔</span><input id="tuniu-transform-col-space" placeholder="左右间距" type="number"/></label><label><span>↕</span><input id="tuniu-transform-row-space" placeholder="上下间距" type="number"/></label>
+<label><span>∠</span><input id="tuniu-transform-angle" placeholder="变换角度" type="number"/></label><label><span>◐</span><input id="tuniu-transform-opacity" placeholder="透明度变化" type="number"/></label>
+</div>
+<div class="tuniu-anchor-grid" aria-label="变换基准点"><button class="active" data-transform-anchor="1" title="锚点1" type="button"></button><button class="" data-transform-anchor="2" title="锚点2" type="button"></button><button class="" data-transform-anchor="3" title="锚点3" type="button"></button><button class="" data-transform-anchor="4" title="锚点4" type="button"></button><button class="" data-transform-anchor="5" title="锚点5" type="button"></button><button class="" data-transform-anchor="6" title="锚点6" type="button"></button><button class="" data-transform-anchor="7" title="锚点7" type="button"></button><button class="" data-transform-anchor="8" title="锚点8" type="button"></button><button class="" data-transform-anchor="9" title="锚点9" type="button"></button></div>
+<div class="tuniu-two-buttons"><button id="tuniu-transform-run" type="button">生成变换</button><button id="tuniu-transform-reset" type="button">重置参数</button></div>
+</div>
+<div class="tool-detail" data-tool-detail-view="distribute">
+<input class="tuniu-full-input" id="tuniu-distribute-gap" placeholder="输入间距" type="number" value="0"/>
+<div class="tuniu-radio-row"><label><input checked name="tuniu-distribute-order" type="radio" value="0"/> 按图层顺序</label><label><input name="tuniu-distribute-order" type="radio" value="1"/> 按坐标位置</label></div>
+<div class="tuniu-two-buttons"><button data-tuniu-distribute="horizontal" type="button">↔ 水平分布</button><button data-tuniu-distribute="vertical" type="button">↕ 垂直分布</button></div>
+</div>
+<div class="tool-detail" data-tool-detail-view="rectangle-set">
+<div class="tuniu-two-fields"><input id="tuniu-rect-width" placeholder="矩形宽度" type="number"/><input id="tuniu-rect-height" placeholder="矩形高度" type="number"/></div>
+<button class="tuniu-wide-button" id="tuniu-rect-run" type="button">确定</button>
+</div>
+<div class="tool-detail" data-tool-detail-view="find-same">
+<p class="find-same-note">图层较多将耗时较长</p>
+<div aria-label="查找相同" class="find-same-grid">
+<button data-find-same-type="textColor" type="button">文字颜色相同</button>
+<button data-find-same-type="textContent" type="button">文字内容相同</button>
+<button data-find-same-type="shapeSize" type="button">形状大小相同</button>
+<button data-find-same-type="shapeFill" type="button">填充颜色相同</button>
+<button data-find-same-type="shapeStroke" type="button">边框颜色相同</button>
+</div>
+</div>
+</div>
+</div>
+
+
+</section>
+<section aria-labelledby="settings-title" class="tool-panel settings-panel" id="settings-panel">
+<div class="ui-page-header"><div class="ui-page-heading"><strong>设置</strong><span>在线翻译、运行性能与本地服务</span></div></div>
+<div class="settings-card settings-primary-card">
+<div class="settings-copy">
+<strong id="settings-title">插件后台运行</strong>
+<span>开启时保留页面状态；关闭后切走再返回会重新加载插件</span>
+</div>
+<label class="switch" title="开启或关闭插件后台运行">
+<input id="background-running" type="checkbox"/>
+<span aria-hidden="true" class="switch-track"><span class="switch-thumb"></span></span>
+</label>
+</div>
+<div class="settings-card settings-reload-card">
+<div class="settings-copy">
+<strong>重新加载插件</strong>
+<span>覆盖安装新版后点击，立即重新读取磁盘上的 HTML、CSS 和脚本，无需重启 Photoshop</span>
+</div>
+<button class="button secondary" id="manual-reload-plugin" type="button">重新加载插件</button>
+</div>
+<div class="settings-card settings-reload-card settings-guide-card">
+<div class="settings-copy">
+<strong>插件使用说明</strong>
+<span>查看安装步骤、功能教程、常见问题、更新记录和历次测试报告</span>
+</div>
+<button class="button secondary" id="open-user-guide" type="button">打开使用说明</button>
+</div>
+<div class="settings-card settings-stack baidu-translator-card">
+<div class="settings-copy settings-copy-with-status">
+<div>
+<strong>百度通用文本翻译</strong>
+<span>用于文字面板在线翻译；标准版无需认证，每月 5 万字符免费</span>
+</div>
+<div class="baidu-translator-badge" id="baidu-translator-badge">未配置</div>
+</div>
+<div class="settings-service-line baidu-service-line">
+<span aria-hidden="true" class="service-dot offline" id="baidu-translator-dot"></span>
+<div class="settings-service-copy">
+<strong>在线翻译：<span id="baidu-translator-state">未配置</span></strong>
+<small id="baidu-translator-detail">请填写百度翻译 APPID 和密钥</small>
+</div>
+</div>
+<label class="settings-field">
+<span>APPID</span>
+<input autocomplete="off" id="baidu-translator-appid" placeholder="填写开发者信息页中的 APPID" spellcheck="false" type="text" value=""/>
+</label>
+<label class="settings-field">
+<span>密钥</span>
+<div class="baidu-secret-row">
+<input autocomplete="new-password" id="baidu-translator-key" placeholder="填写开发者信息页中的密钥" spellcheck="false" type="password" value=""/>
+<button aria-label="显示或隐藏密钥" class="baidu-secret-toggle" id="baidu-translator-key-toggle" title="显示或隐藏密钥" type="button">显示</button>
+<button class="baidu-secret-clear" id="baidu-translator-key-clear" title="清除已保存的 APPID 和密钥" type="button">清除</button>
+</div>
+</label>
+<div class="baidu-language-grid">
+<label class="settings-field"><span>默认源语言</span><select id="baidu-translator-from"><option value="auto">自动检测</option><option value="zh">简体中文</option><option value="cht">繁体中文</option><option value="en">英语</option><option value="jp">日语</option><option value="kor">韩语</option><option value="fra">法语</option><option value="de">德语</option><option value="spa">西班牙语</option><option value="it">意大利语</option><option value="ru">俄语</option><option value="vie">越南语</option><option value="th">泰语</option></select></label>
+<label class="settings-field"><span>默认目标语言</span><select id="baidu-translator-to"><option value="en">英语</option><option value="zh">简体中文</option><option value="cht">繁体中文</option><option value="jp">日语</option><option value="kor">韩语</option><option value="fra">法语</option><option value="de">德语</option><option value="spa">西班牙语</option><option value="it">意大利语</option><option value="ru">俄语</option><option value="vie">越南语</option><option value="th">泰语</option></select></label>
+</div>
+<div class="baidu-settings-actions">
+<button class="button secondary" id="baidu-translator-save" type="button">保存配置</button>
+<button class="button primary" id="baidu-translator-test" type="button">保存并测试</button>
+</div>
+<p class="hint settings-hint">APPID、密钥和语言偏好独立保存在 %APPDATA%\XinyangAssistant\credentials，并优先使用 DPAPI 加密；覆盖更新、重新加载或卸载插件时均会保留。</p>
+<details class="baidu-tutorial">
+<summary>注册与填写教程</summary>
+<div class="baidu-tutorial-body">
+<ol>
+<li>使用百度账号登录百度翻译开放平台，注册成为开发者。</li>
+<li>开通“通用文本翻译 API”，选择<strong>标准版</strong>；标准版无需个人或企业认证。</li>
+<li>进入管理控制台的“开发者信息”，复制 <strong>APPID</strong> 和<strong>密钥</strong>。</li>
+<li>将两项凭据填入上方，源语言可保持“自动检测”，目标语言按需选择。</li>
+<li>点击“保存并测试”，出现绿色“连接正常”后即可在文字面板使用翻译。</li>
+</ol>
+<div class="baidu-tutorial-links">
+<button data-baidu-url="https://fanyi-api.baidu.com/register" type="button">注册百度翻译开发者</button>
+<button data-baidu-url="https://fanyi-api.baidu.com/access/0/1" type="button">开通通用文本翻译</button>
+<button data-baidu-url="https://fanyi-api.baidu.com/manage/overview" type="button">打开管理控制台</button>
+<button data-baidu-url="https://fanyi-api.baidu.com/product/113" type="button">查看 API 接入文档</button>
+</div>
+<p class="hint settings-hint">标准版每月免费 5 万字符、QPS 为 1、单次最长 1000 字符；插件会自动控制请求频率并分批处理。</p>
+</div>
+</details>
+</div>
+<div class="settings-card settings-stack settings-service-card">
+<div class="settings-copy">
+<strong>本机服务与本地模型</strong>
+<span>OCR 按需检测；LaMa 模型仅在擦除时启动，空闲后自动关闭</span>
+</div>
+<div class="settings-service-line">
+<span aria-hidden="true" class="service-dot checking" id="local-ocr-dot"></span>
+<div class="settings-service-copy">
+<strong>OCR：<span id="local-ocr-state">正在检测</span></strong>
+<small id="local-ocr-detail">等待本机 OCR 服务响应</small>
+</div>
+</div>
+<div class="settings-service-line">
+<span aria-hidden="true" class="service-dot checking" id="local-lama-dot"></span>
+<div class="settings-service-copy">
+<strong>LaMa 本地模型：<span id="local-lama-state">等待检测</span></strong>
+<small id="local-lama-detail">尚未检测本地模型与服务</small>
+</div>
+</div>
+<label class="settings-field settings-model-path-field">
+<span>模型安装位置</span>
+<div class="settings-path-row"><input id="iopaint-install-path" placeholder="尚未下载本地模型" readonly spellcheck="false" type="text" value=""/><button class="button secondary" id="download-local-iopaint" type="button">下载本地模型</button></div>
+</label>
+<div class="model-download-progress" hidden id="iopaint-download-progress">
+<div class="model-progress-copy"><span id="iopaint-progress-text">准备下载</span><strong id="iopaint-progress-percent">0%</strong></div>
+<div aria-label="模型下载进度" aria-valuemax="100" aria-valuemin="0" aria-valuenow="0" class="model-progress-track" id="iopaint-progress-track" role="progressbar"><span id="iopaint-progress-bar"></span></div>
+</div>
+<label class="settings-field settings-idle-field"><span>服务空闲自动关闭</span><select id="iopaint-idle-minutes"><option value="5">5 分钟</option><option selected value="10">10 分钟</option><option value="20">20 分钟</option><option value="30">30 分钟</option><option value="60">60 分钟</option></select></label>
+<label class="settings-field settings-service-url-field">
+<span>兼容外部 LaMa 服务地址</span>
+<input id="lama-service-url" placeholder="自动检测 127.0.0.1:8867 / 8080" spellcheck="false" type="text" value=""/>
+</label>
+<div class="settings-service-actions">
+<button class="button secondary" id="detect-local-ocr" type="button">保存并检测</button>
+<button class="button secondary" hidden id="stop-local-iopaint" type="button">停止模型服务</button>
+</div>
+<p class="hint settings-hint">首次下载会使用本机 Python 3.10/3.11 在所选位置创建独立运行环境并校验 LaMa 模型；执行擦除时按需启动，退出插件或 Photoshop 时自动结束。</p>
+</div>
+<div class="settings-card settings-stack diagnostics-card">
+<div class="settings-copy">
+<strong>调试与问题报告</strong>
+<span>导出运行环境、最近操作、错误记录、Photoshop 调用和本机服务探测，便于定位问题</span>
+</div>
+<div class="diagnostics-summary" id="diagnostics-summary">尚未记录调试信息</div>
+<div class="diagnostics-actions">
+<button class="button primary" id="export-debug-report" type="button">导出调试报告</button>
+<button class="button secondary" id="clear-debug-log" type="button">清空日志</button>
+</div>
+<p class="diagnostics-last-export" id="diagnostics-last-export"></p>
+<p class="hint settings-hint">报告会自动隐藏百度翻译密钥、APPID、用户目录、长令牌和常见素材文件名；不会包含图片像素、PSD 内容或文字图层正文。复现问题后请尽快导出，再将 TXT 文件发来分析。</p>
+</div>
+<details class="settings-accordion">
+<summary>OCR API 备用配置</summary>
+<div class="settings-accordion-body">
+<label class="settings-field">
+<span>API 请求地址</span>
+<input id="ocr-api-url" placeholder="https://example.com/ocr" spellcheck="false" type="text" value=""/>
+</label>
+<label class="settings-field">
+<span>API 密钥（Bearer，可选）</span>
+<input autocomplete="off" id="ocr-api-key" type="password" value=""/>
+</label>
+<button class="button secondary full" id="test-ocr-api" type="button">测试 API 配置</button>
+<p class="hint settings-hint">本机 OCR 不可用时调用；接口需返回文字内容与坐标框。</p>
+</div>
+</details>
+<p aria-live="polite" class="plugin-version" id="plugin-version">当前版本 v2.2.69</p>
+</section>
+</section>
+<footer aria-atomic="true" aria-live="polite" class="status-bar" role="status">
+<span id="status-text">就绪</span>
+</footer>
+</div>
+</main>
+<script src="js/CSInterface.js?v=2.2.05"></script>
+<script src="js/runtime.js?v=2.2.69"></script>
+<script src="js/diagnostics.js?v=2.2.69"></script>
+<script src="js/modules/settings/storage.js?v=2.2.69"></script>
+<script src="js/panel.js?v=2.2.69"></script>
+<script src="js/ui-polish.js?v=2.2.69"></script>
+</body>
+</html>

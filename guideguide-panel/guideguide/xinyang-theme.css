@@ -1,0 +1,854 @@
+/*
+ * 鑫洋助理参考线页视觉统一层
+ * 仅覆盖外观，不修改 GuideGuide 4.6.0 的 DOM、图标、事件和宿主交互。
+ */
+
+:root {
+  --xy-bg: #242424;
+  --xy-panel: #303030;
+  --xy-panel-2: #292929;
+  --xy-control: #1f1f1f;
+  --xy-control-hover: #383838;
+  --xy-border: #4b4b4b;
+  --xy-border-strong: #606060;
+  --xy-text: #f2f2f2;
+  --xy-text-soft: #d2d2d2;
+  --xy-muted: #a9a9a9;
+  --xy-accent: #2d76f3;
+  --xy-accent-hover: #3f84fa;
+  --xy-accent-soft: #283b5d;
+  --xy-danger: #d65252;
+  --xy-radius: 6px;
+  --xy-scrollbar: #5b5b5b;
+  --xy-scrollbar-hover: #767676;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--xy-bg) !important;
+}
+
+body {
+  margin: 0;
+  color: var(--xy-text);
+  font-family: "Microsoft YaHei UI", "Segoe UI", sans-serif !important;
+  font-size: 12px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Photoshop 切换明暗主题时，参考线页仍与鑫洋助理主界面保持同一套深色风格。 */
+.theme-lighter,
+.theme-light,
+.theme-dark,
+.theme-darker {
+  background: var(--xy-bg) !important;
+  color: var(--xy-text) !important;
+}
+
+.guideguide {
+  background: var(--xy-bg);
+}
+
+.guideguide a,
+.theme-lighter a,
+.theme-light a,
+.theme-dark a,
+.theme-darker a {
+  color: var(--xy-text-soft) !important;
+}
+
+/* 顶部页签 */
+.header {
+  height: 40px;
+  border-bottom: 1px solid var(--xy-border);
+  background: #202020;
+}
+
+.header-wrapper {
+  padding: 5px 8px;
+}
+
+.header h3 {
+  height: 28px;
+  line-height: 28px;
+  color: var(--xy-text);
+  font-size: 12px;
+}
+
+.header + hr {
+  display: none;
+}
+
+.header .button-group {
+  height: 30px;
+}
+
+.header .trough,
+.tab-group .trough,
+.footer .trough {
+  padding: 0;
+  border-radius: var(--xy-radius);
+  background: transparent !important;
+  background-image: none !important;
+}
+
+.tab-group {
+  height: 30px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.tab-group .button,
+.theme-lighter .tab-group .button,
+.theme-light .tab-group .button,
+.theme-dark .tab-group .button,
+.theme-darker .tab-group .button {
+  position: relative;
+  height: 28px;
+  border: 0 !important;
+  border-radius: 0 !important;
+  color: var(--xy-muted) !important;
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  line-height: 28px;
+}
+
+.tab-group .button:hover {
+  color: var(--xy-text) !important;
+  background: #2b2b2b !important;
+}
+
+.tab-group .button.is-active,
+.theme-lighter .tab-group .button.is-active,
+.theme-light .tab-group .button.is-active,
+.theme-dark .tab-group .button.is-active,
+.theme-darker .tab-group .button.is-active {
+  color: #fff !important;
+  font-weight: 600;
+  background: transparent !important;
+}
+
+.tab-group .button.is-active::after {
+  position: absolute;
+  right: 12px;
+  bottom: 0;
+  left: 12px;
+  height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: #6fa2ff;
+  content: "";
+}
+
+/* 内容区 */
+.push-below-tabs {
+  margin-top: 40px;
+  background: var(--xy-bg);
+}
+
+.side-padding {
+  padding-right: 10px;
+  padding-left: 10px;
+}
+
+.stretch-layout {
+  margin-right: 10px;
+  margin-left: 10px;
+}
+
+.ez-form form {
+  margin-top: 10px;
+}
+
+.ez-form .fields {
+  margin-bottom: 8px;
+}
+
+.ez-form tr td {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+.ez-form td:first-child .cell-padding {
+  padding-right: 4px;
+}
+
+.ez-form td:last-child .cell-padding {
+  padding-left: 4px;
+}
+
+/* 通用按钮 */
+.button,
+.theme-lighter .button,
+.theme-light .button,
+.theme-dark .button,
+.theme-darker .button {
+  height: 26px;
+  padding-right: 9px;
+  padding-left: 9px;
+  border: 1px solid var(--xy-border) !important;
+  border-radius: var(--xy-radius) !important;
+  color: var(--xy-text-soft) !important;
+  background: #343434 !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  line-height: 24px;
+  transition: background-color .12s ease, border-color .12s ease, color .12s ease;
+}
+
+.button:hover,
+.theme-lighter .button:hover,
+.theme-light .button:hover,
+.theme-dark .button:hover,
+.theme-darker .button:hover {
+  border-color: var(--xy-border-strong) !important;
+  color: #fff !important;
+  background: var(--xy-control-hover) !important;
+}
+
+.button:active,
+.theme-lighter .button:active,
+.theme-light .button:active,
+.theme-dark .button:active,
+.theme-darker .button:active {
+  border-color: #5e8fe5 !important;
+  background: var(--xy-accent-soft) !important;
+}
+
+.button.is-disabled,
+.button.is-disabled:hover,
+.button.is-disabled:active {
+  opacity: .42;
+  border-color: var(--xy-border) !important;
+  color: var(--xy-muted) !important;
+  background: #303030 !important;
+}
+
+.button-group .iconned {
+  width: 31px;
+}
+
+.button-group .iconned .button {
+  width: 28px;
+  padding: 0;
+}
+
+/* 输入框、下拉框 */
+.iconned-input .input-padding,
+.text-input .input-padding,
+.custom-input .graphics,
+.saved-list .graphics,
+.theme-lighter .iconned-input .input-padding,
+.theme-light .iconned-input .input-padding,
+.theme-dark .iconned-input .input-padding,
+.theme-darker .iconned-input .input-padding,
+.theme-lighter .text-input .input-padding,
+.theme-light .text-input .input-padding,
+.theme-dark .text-input .input-padding,
+.theme-darker .text-input .input-padding,
+.theme-lighter .custom-input .graphics,
+.theme-light .custom-input .graphics,
+.theme-dark .custom-input .graphics,
+.theme-darker .custom-input .graphics,
+.theme-lighter .saved-list .graphics,
+.theme-light .saved-list .graphics,
+.theme-dark .saved-list .graphics,
+.theme-darker .saved-list .graphics {
+  border: 1px solid var(--xy-border) !important;
+  border-radius: var(--xy-radius) !important;
+  background: var(--xy-control) !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+.iconned-input .input-padding,
+.text-input .input-padding {
+  height: 28px;
+  line-height: 26px;
+}
+
+.iconned-input .input-padding {
+  padding-right: 7px;
+  padding-left: 31px;
+}
+
+.iconned-input .icon-holder {
+  width: 28px;
+  height: 27px;
+  border-radius: 5px 0 0 5px;
+  background: #303030;
+}
+
+.iconned-input input,
+.text-input input {
+  height: 26px;
+  color: var(--xy-text) !important;
+  font-family: "Microsoft YaHei UI", "Segoe UI", sans-serif !important;
+  font-size: 12px;
+  background: transparent !important;
+}
+
+.iconned-input input::-webkit-input-placeholder,
+.text-input input::-webkit-input-placeholder,
+.custom-input textarea::-webkit-input-placeholder {
+  color: #777 !important;
+}
+
+.iconned-input.is-focused .input-padding,
+.text-input.is-focused .input-padding,
+.custom-input.is-focused .graphics {
+  border-color: #6fa2ff !important;
+  box-shadow: 0 0 0 1px rgba(111, 162, 255, .18) !important;
+}
+
+.text-input.is-invalid .input-padding,
+.custom-input.has-error .graphics {
+  border-color: var(--xy-danger) !important;
+}
+
+.dropdown {
+  margin-bottom: 8px;
+}
+
+.dropdown .target,
+.dropdown .options,
+.theme-lighter .dropdown .target,
+.theme-light .dropdown .target,
+.theme-dark .dropdown .target,
+.theme-darker .dropdown .target,
+.theme-lighter .dropdown .options,
+.theme-light .dropdown .options,
+.theme-dark .dropdown .options,
+.theme-darker .dropdown .options {
+  border: 1px solid var(--xy-border) !important;
+  color: var(--xy-text-soft) !important;
+  background: var(--xy-control) !important;
+}
+
+.dropdown .target {
+  height: 28px;
+  border-radius: var(--xy-radius) !important;
+}
+
+.dropdown .item {
+  height: 27px;
+  border-top-color: transparent !important;
+  border-bottom-color: #3e3e3e !important;
+  line-height: 27px;
+}
+
+.dropdown .item .label {
+  padding-left: 31px;
+}
+
+.dropdown .target .arrow {
+  width: 27px;
+  height: 27px;
+  border-left: 1px solid var(--xy-border);
+}
+
+.dropdown .target .arrow::before {
+  top: 11px;
+  left: 9px;
+  border-width: 4px;
+  border-top-color: var(--xy-text-soft) !important;
+}
+
+.dropdown .options {
+  top: 4px;
+  z-index: 50;
+  overflow: hidden;
+  border-radius: var(--xy-radius) !important;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, .38);
+}
+
+.dropdown .item:hover,
+.theme-lighter .dropdown .item:hover,
+.theme-light .dropdown .item:hover,
+.theme-dark .dropdown .item:hover,
+.theme-darker .dropdown .item:hover {
+  color: #fff !important;
+  background: #383838 !important;
+}
+
+/* 自定义参考线编辑区 */
+.custom-input .outer-padding,
+.saved-list .outer-padding {
+  margin: 0;
+}
+
+.custom-input .inner-padding {
+  margin: 7px 8px;
+}
+
+.custom-input textarea {
+  color: var(--xy-text) !important;
+  font-family: Consolas, "Microsoft YaHei UI", monospace !important;
+  font-size: 12px;
+  line-height: 1.55;
+  background: transparent !important;
+}
+
+.custom-errors ul {
+  margin: 0 1px 1px;
+  border-radius: 0 0 5px 5px;
+}
+
+.custom-errors li,
+.theme-lighter .custom-errors li,
+.theme-light .custom-errors li,
+.theme-dark .custom-errors li,
+.theme-darker .custom-errors li {
+  height: 24px;
+  border-top-color: #b54444 !important;
+  color: #fff;
+  background: var(--xy-danger) !important;
+  line-height: 22px;
+}
+
+/* 预设列表 */
+.saved-list .inner-padding {
+  margin: 5px;
+}
+
+.saved-list .graphics {
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.saved-list li .item,
+.theme-lighter .saved-list li > .item,
+.theme-light .saved-list li > .item,
+.theme-dark .saved-list li > .item,
+.theme-darker .saved-list li > .item {
+  height: 30px;
+  margin: 2px;
+  padding-right: 8px;
+  padding-left: 8px;
+  border: 1px solid transparent;
+  border-radius: 5px !important;
+  color: var(--xy-text-soft) !important;
+  background: #303030 !important;
+  line-height: 28px;
+}
+
+.saved-list li > .item:hover {
+  border-color: var(--xy-border-strong);
+  color: #fff !important;
+  background: #383838 !important;
+}
+
+.saved-list li > .item.is-selected,
+.saved-list li > .item.is-selected:hover,
+.theme-lighter .saved-list li > .item.is-selected,
+.theme-light .saved-list li > .item.is-selected,
+.theme-dark .saved-list li > .item.is-selected,
+.theme-darker .saved-list li > .item.is-selected {
+  border-color: #5e8fe5 !important;
+  color: #fff !important;
+  background: var(--xy-accent-soft) !important;
+}
+
+.saved-list ul.empty li {
+  color: var(--xy-muted) !important;
+}
+
+/* 底部操作区 */
+.footer .actions,
+.footer hr,
+.theme-lighter .footer .actions,
+.theme-light .footer .actions,
+.theme-dark .footer .actions,
+.theme-darker .footer .actions {
+  background: var(--xy-panel) !important;
+}
+
+.footer .actions {
+  max-height: 50px;
+  border-top: 1px solid var(--xy-border);
+}
+
+.footer.is-showing-more .actions {
+  max-height: 320px;
+}
+
+.footer .button-group {
+  margin-top: 8px;
+  margin-bottom: 8px;
+}
+
+.footer .footer-button-collection .button {
+  height: 30px;
+  line-height: 28px;
+}
+
+.footer .footer-button-collection .button-group-cell:first-child .button {
+  border-color: #4d83df !important;
+  color: #fff !important;
+  background: var(--xy-accent) !important;
+}
+
+.footer .footer-button-collection .button-group-cell:first-child .button:hover {
+  border-color: #6fa2ff !important;
+  background: var(--xy-accent-hover) !important;
+}
+
+.footer .quick-guides,
+.theme-lighter .footer .quick-guides,
+.theme-light .footer .quick-guides,
+.theme-dark .footer .quick-guides,
+.theme-darker .footer .quick-guides {
+  border-top: 1px solid var(--xy-border) !important;
+  background: #202020 !important;
+}
+
+.footer .quick-guides .button {
+  height: 12px;
+  min-height: 0;
+  padding: 2px 0 4px;
+  border: 0 !important;
+  background: transparent !important;
+  line-height: 8px;
+}
+
+.footer .dot {
+  background: var(--xy-muted) !important;
+}
+
+/* 为略增高的控件预留原有底部交互空间。 */
+.stretch-layout .buttons {
+  bottom: 54px;
+  height: 30px;
+}
+
+.fit-above-buttons {
+  margin-bottom: 88px;
+}
+
+/* 导入、导出及提示层 */
+.porter,
+.theme-lighter .porter,
+.theme-light .porter,
+.theme-dark .porter,
+.theme-darker .porter {
+  color: var(--xy-text);
+  background: var(--xy-bg) !important;
+}
+
+.porter h3 {
+  height: 40px;
+  border-bottom: 1px solid var(--xy-border);
+  color: #fff;
+  background: #202020;
+  font-size: 12px;
+  line-height: 40px;
+}
+
+.alert-wrap,
+.theme-lighter .alert-wrap,
+.theme-light .alert-wrap,
+.theme-dark .alert-wrap,
+.theme-darker .alert-wrap {
+  margin: 24px;
+  border: 1px solid var(--xy-border) !important;
+  border-radius: 8px;
+  color: var(--xy-text);
+  background: var(--xy-panel) !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .45) !important;
+}
+
+.alert-backplate,
+.theme-lighter .alert-backplate,
+.theme-light .alert-backplate,
+.theme-dark .alert-backplate,
+.theme-darker .alert-backplate {
+  background: rgba(0, 0, 0, .58) !important;
+}
+
+/* 图标保持原资源和形状，只调整颜色以适配统一界面。 */
+.guideguide svg path,
+.guideguide svg polygon,
+.guideguide svg rect,
+.guideguide svg circle,
+.theme-lighter svg path,
+.theme-light svg path,
+.theme-dark svg path,
+.theme-darker svg path,
+.theme-lighter svg polygon,
+.theme-light svg polygon,
+.theme-dark svg polygon,
+.theme-darker svg polygon {
+  fill: #d7d7d7 !important;
+}
+
+.iconned-input.is-highlighting-distribute .icon-holder path,
+.iconned-input.is-highlighting-distribute .icon-holder polygon {
+  fill: #6fa2ff !important;
+}
+
+/* 提示气泡 */
+.tooltipped::after,
+.theme-lighter .tooltipped::after,
+.theme-light .tooltipped::after,
+.theme-dark .tooltipped::after,
+.theme-darker .tooltipped::after {
+  padding: 5px 8px;
+  border: 1px solid var(--xy-border);
+  border-radius: 5px;
+  color: #fff !important;
+  background: #171717 !important;
+  box-shadow: 0 6px 15px rgba(0, 0, 0, .35);
+  font-family: "Microsoft YaHei UI", "Segoe UI", sans-serif;
+  font-size: 11px;
+}
+
+/* 分隔线 */
+hr,
+.theme-lighter hr,
+.theme-light hr,
+.theme-dark hr,
+.theme-darker hr {
+  border-top: 1px solid var(--xy-border) !important;
+  border-bottom: 0 !important;
+}
+
+/* 滚动条与主插件一致 */
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  min-width: 30px;
+  min-height: 30px;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: var(--xy-scrollbar);
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--xy-scrollbar-hover);
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* 小尺寸面板保持紧凑，不改变控件顺序和交互。 */
+@media (max-width: 300px), (max-height: 430px) {
+  .side-padding {
+    padding-right: 7px;
+    padding-left: 7px;
+  }
+
+  .stretch-layout {
+    margin-right: 7px;
+    margin-left: 7px;
+  }
+
+  .ez-form tr td {
+    padding-top: 3px;
+    padding-bottom: 3px;
+  }
+
+  .button {
+    padding-right: 6px;
+    padding-left: 6px;
+  }
+}
+
+
+/* v2.1.14：参考线图标统一居中，并恢复底部快捷图标完整高度 */
+.button-group .iconned .button,
+.button-group .iconned .button .trough,
+.iconned-input .icon-holder,
+.footer .quick-guides .button,
+.footer .quick-guides .button .trough {
+  box-sizing: border-box;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.button-group .iconned {
+  width: 31px !important;
+  vertical-align: middle !important;
+}
+
+.button-group .iconned .button {
+  width: 28px !important;
+  height: 28px !important;
+  min-height: 28px !important;
+  padding: 0 !important;
+  line-height: 28px !important;
+}
+
+.button-group .iconned .button .trough {
+  width: 100%;
+  height: 100%;
+  padding: 0 !important;
+}
+
+.button-group .iconned svg,
+.button-group .iconned .button svg,
+.iconned-input .icon-holder svg,
+.footer .quick-guides svg {
+  display: block !important;
+  flex: 0 0 auto;
+  width: 17px !important;
+  height: 17px !important;
+  margin: 0 auto !important;
+  transform: none !important;
+}
+
+.iconned-input .icon-holder {
+  top: 0 !important;
+  bottom: 0 !important;
+  width: 29px !important;
+  height: 28px !important;
+  margin: auto 0 !important;
+  padding: 0 !important;
+}
+
+.footer .quick-guides {
+  min-height: 32px !important;
+  line-height: 32px !important;
+}
+
+.footer .quick-guides .button-group {
+  height: 32px !important;
+  margin: 0 !important;
+}
+
+.footer .quick-guides .button-group-cell {
+  height: 32px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  vertical-align: middle !important;
+}
+
+.footer .quick-guides .button {
+  width: 100% !important;
+  height: 32px !important;
+  min-height: 32px !important;
+  padding: 0 !important;
+  line-height: 32px !important;
+}
+
+.footer .quick-guides .button .trough {
+  width: 100%;
+  height: 100%;
+  padding: 0 !important;
+}
+
+.footer .quick-guides svg {
+  width: 18px !important;
+  height: 18px !important;
+}
+
+/* 底部快捷栏增高后，为内容区与固定操作按钮预留对应空间。 */
+.stretch-layout .buttons {
+  bottom: 72px !important;
+}
+
+.fit-above-buttons {
+  margin-bottom: 106px !important;
+}
+
+
+/* v2.1.25：参考线页图标、底栏与字体统一修正 */
+html, body, body *, button, input, textarea, select, option, .button, .label, .message {
+  font-family: "Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI", sans-serif !important;
+}
+.guideguide .button,
+.guideguide .button .trough,
+.guideguide .icon-holder,
+.guideguide .icon-holder .trough,
+.footer .quick-guides .button,
+.footer .quick-guides .button .trough {
+  box-sizing: border-box !important;
+}
+.guideguide .button .trough,
+.guideguide .icon-holder,
+.guideguide .icon-holder .trough,
+.footer .quick-guides .button,
+.footer .quick-guides .button .trough {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+.guideguide svg,
+.guideguide .button svg,
+.guideguide .icon-holder svg,
+.footer .quick-guides svg {
+  position: static !important;
+  inset: auto !important;
+  display: block !important;
+  flex: 0 0 auto !important;
+  margin: 0 auto !important;
+  transform: none !important;
+  vertical-align: middle !important;
+}
+.button-group .iconned, .button-group .iconned .trough { vertical-align: middle !important; }
+.button-group .iconned .button { overflow: hidden !important; }
+.iconned-input .icon-holder { overflow: hidden !important; }
+
+.footer {
+  box-sizing: border-box !important;
+  overflow: visible !important;
+}
+.footer .actions {
+  box-sizing: border-box !important;
+  max-height: 54px !important;
+  overflow: hidden !important;
+}
+.footer.is-showing-more .actions { max-height: 320px !important; overflow-y: auto !important; }
+.footer .quick-guides {
+  box-sizing: border-box !important;
+  height: 38px !important;
+  min-height: 38px !important;
+  overflow: hidden !important;
+  line-height: 38px !important;
+}
+.footer .quick-guides .button-group,
+.footer .quick-guides .button-group-cell,
+.footer .quick-guides .button,
+.footer .quick-guides .button .trough {
+  box-sizing: border-box !important;
+  height: 38px !important;
+  min-height: 38px !important;
+  max-height: 38px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  vertical-align: middle !important;
+}
+.footer .quick-guides svg { width: 17px !important; height: 17px !important; max-width:17px !important; max-height:17px !important; }
+.stretch-layout .buttons { bottom: 82px !important; }
+.fit-above-buttons { margin-bottom: 118px !important; }
+
+
+/* v2.1.25：参考线页与主界面视觉规范同步 */
+html, body, button, input, select, textarea {
+  font-family: "Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI", sans-serif !important;
+}
+
+button, input, select, textarea,
+.gg-button, .gg-input, .gg-select {
+  border-radius: 6px !important;
+}
+
+body {
+  color: #f2f2f2 !important;
+  background: #242424 !important;
+}

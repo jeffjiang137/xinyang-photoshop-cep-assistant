@@ -1,0 +1,25 @@
+name: Feature request
+description: 提议一个能改善 Photoshop 电商设计流程的功能
+title: "[Feature] "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 要解决的问题
+      description: 目前哪一步最耗时或最容易出错？
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 期望方案
+      description: 描述你希望面板如何工作。
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 现有替代方案
+      description: 目前如何完成这项工作？

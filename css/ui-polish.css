@@ -1,0 +1,1459 @@
+/* 鑫洋助理 v2.1.59：第二轮视觉与交互细化
+   仅优化信息层级、展开反馈、键盘焦点、提示与窄面板适配。 */
+
+:root {
+  --ui-section-line: rgba(117, 126, 138, .24);
+  --ui-focus-ring: 0 0 0 2px rgba(79, 134, 247, .22);
+}
+
+/* 章节标签：降低连续控件造成的“灰块堆叠感” */
+.ui-section-kicker {
+  display: flex;
+  min-width: 0;
+  margin: 11px 0 6px;
+  align-items: center;
+  gap: 7px;
+  color: var(--ui-text-3);
+  font-size: 9px;
+  line-height: 14px;
+  letter-spacing: .06em;
+}
+
+.ui-section-kicker::after {
+  min-width: 14px;
+  height: 1px;
+  flex: 1;
+  background: linear-gradient(90deg, var(--ui-section-line), transparent);
+  content: "";
+}
+
+.ui-section-kicker > span {
+  flex: 0 0 auto;
+  color: #c7ccd3;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .04em;
+}
+
+.ui-section-kicker > small {
+  min-width: 0;
+  overflow: hidden;
+  color: #747c87;
+  font-size: 9px;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ui-section-kicker-wide { margin-top: 9px; }
+.common-section-kicker { margin: 8px 0 6px; }
+.common-grid-kicker { margin-top: 13px; }
+
+/* 文字页：强化模块分组，保持高密度但避免粘连 */
+.typography-panel .words-body-section > .ui-section-kicker:first-child {
+  margin-top: 1px;
+}
+
+.typography-panel .words-divider {
+  height: 1px !important;
+  margin: 10px 0 0 !important;
+  background: linear-gradient(90deg, transparent, #373c43 12%, #373c43 88%, transparent) !important;
+}
+
+.words-weight-chips,
+.words-public-tools,
+.words-action-toolbar,
+.words-align-grid,
+.words-hierarchy {
+  border-radius: 6px;
+}
+
+.words-public-tools,
+.words-action-toolbar,
+.words-align-grid {
+  padding: 4px !important;
+  border: 1px solid #373c43 !important;
+  background: rgba(37, 40, 45, .72) !important;
+}
+
+.words-public-tools button,
+.words-action-toolbar button,
+.words-align-grid button {
+  min-height: 29px !important;
+  border-radius: 4px !important;
+}
+
+.words-action-toolbar {
+  display: grid !important;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 4px !important;
+}
+
+.words-action-toolbar .words-tool-separator { display: none !important; }
+
+.words-hierarchy {
+  padding: 7px !important;
+  border: 1px solid #373c43 !important;
+  background: rgba(37, 40, 45, .72) !important;
+}
+
+.words-auto-layout-toggle {
+  min-height: 34px !important;
+  border-color: #414750 !important;
+  background: linear-gradient(180deg, #30343a, #292d32) !important;
+}
+
+.words-auto-layout-toggle:hover {
+  border-color: #5a6470 !important;
+  background: linear-gradient(180deg, #383d44, #30353b) !important;
+}
+
+.words-auto-layout-panel {
+  margin-top: 6px !important;
+  border-color: #414750 !important;
+  background: #25282d !important;
+}
+
+/* 常用功能：缩放、快速排版和工具宫格形成清晰章节 */
+.common-zooms {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.018);
+}
+
+.common-align-row,
+.common-layout-row,
+.common-flip-row {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.018);
+}
+
+.common-tools-grid {
+  margin-top: 0 !important;
+}
+
+.common-tool-item {
+  min-height: 68px;
+  border-radius: 7px;
+}
+
+.common-tool-button {
+  border-radius: 7px !important;
+}
+
+.common-tool-button:active .common-tool-icon {
+  transform: translateY(0) scale(.96) !important;
+}
+
+.common-tool-item.detail-row-active {
+  background: rgba(58, 82, 121, .12);
+}
+
+.common-tool-item.detail-row-active::after {
+  right: 18px !important;
+  bottom: -7px !important;
+  left: 18px !important;
+  height: 2px !important;
+  background: var(--ui-accent) !important;
+}
+
+/* 参数抽屉增加归属标题和明确关闭入口 */
+.common-tools-parameter-drawer.drawer-collapsed .ui-drawer-header,
+.common-tools-parameter-drawer.drawer-collapsed .tool-detail {
+  display: none !important;
+}
+
+.common-tools-parameter-drawer {
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  background: #25282d;
+}
+
+.common-tools-grid > .common-tools-parameter-drawer {
+  padding: 0 !important;
+}
+
+.ui-drawer-header {
+  display: flex;
+  min-height: 39px;
+  padding: 6px 7px 6px 9px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-bottom: 1px solid #3a3f46;
+  background: #292d32;
+}
+
+.ui-drawer-header > div {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.ui-drawer-header strong {
+  overflow: hidden;
+  color: var(--ui-text);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ui-drawer-header span {
+  overflow: hidden;
+  color: var(--ui-text-3);
+  font-size: 9px;
+  line-height: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#ui-drawer-close {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  padding: 0;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: var(--ui-text-3);
+  background: transparent;
+}
+
+#ui-drawer-close:hover {
+  border-color: #474e57;
+  color: #fff;
+  background: #353a41;
+}
+
+#ui-drawer-close svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 1.6;
+}
+
+.common-tools-grid > .common-tools-parameter-drawer .tool-detail,
+.common-tools-parameter-drawer .tool-detail {
+  margin: 0 !important;
+  padding: 9px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: #25282d !important;
+}
+
+/* 导出：高级项默认收起，摘要行拥有明确箭头和命中区域 */
+.tuniu-export-panel details {
+  transition: border-color .1s ease, background-color .1s ease;
+}
+
+.tuniu-export-panel details:hover {
+  border-color: #4b535d;
+}
+
+.tuniu-export-panel summary {
+  position: relative;
+  min-height: 34px;
+  padding: 8px 30px 8px 9px !important;
+  color: var(--ui-text-2) !important;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 16px;
+  list-style: none;
+  cursor: pointer;
+}
+
+.tuniu-export-panel summary::-webkit-details-marker { display: none; }
+
+.tuniu-export-panel summary::after {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  width: 7px;
+  height: 7px;
+  transform: translateY(-65%) rotate(45deg);
+  border-right: 1.5px solid #9098a2;
+  border-bottom: 1.5px solid #9098a2;
+  content: "";
+  transition: transform .12s ease;
+}
+
+.tuniu-export-panel details[open] > summary {
+  color: #fff !important;
+  background: #292d32;
+}
+
+.tuniu-export-panel details[open] > summary::after {
+  transform: translateY(-35%) rotate(225deg);
+}
+
+/* 设置：服务状态更像可扫描的系统状态，而不是普通正文 */
+.settings-service-line {
+  border-radius: 5px;
+}
+
+.settings-service-copy strong {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.settings-service-copy strong span {
+  display: inline-flex;
+  min-height: 18px;
+  padding: 1px 6px;
+  align-items: center;
+  border: 1px solid #484f58;
+  border-radius: 9px;
+  color: #bdc4cd;
+  background: #25282d;
+  font-size: 9px;
+  font-weight: 500;
+}
+
+/* 通用键盘焦点，避免仅靠浏览器默认蓝框 */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible,
+[tabindex]:focus-visible {
+  outline: none !important;
+  border-color: var(--ui-border-focus) !important;
+  box-shadow: var(--ui-focus-ring) !important;
+}
+
+button[disabled],
+input[disabled],
+select[disabled],
+textarea[disabled] {
+  cursor: not-allowed !important;
+  filter: saturate(.55);
+  opacity: .48 !important;
+}
+
+/* 自定义延迟提示：仅对图标型控件启用，避免重复占空间 */
+[data-ui-tooltip] {
+  position: relative;
+}
+
+[data-ui-tooltip]::before,
+[data-ui-tooltip]::after {
+  position: absolute;
+  z-index: 160;
+  left: 50%;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity .12s ease .42s, visibility 0s linear .54s, transform .12s ease .42s;
+}
+
+[data-ui-tooltip]::before {
+  bottom: calc(100% + 8px);
+  max-width: 180px;
+  padding: 5px 7px;
+  transform: translate(-50%, 3px);
+  border: 1px solid #555e68;
+  border-radius: 5px;
+  color: #f7f8fa;
+  background: #17191c;
+  box-shadow: 0 5px 18px rgba(0,0,0,.34);
+  content: attr(data-ui-tooltip);
+  font-size: 9px;
+  font-weight: 400;
+  line-height: 13px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+[data-ui-tooltip]::after {
+  bottom: calc(100% + 4px);
+  width: 7px;
+  height: 7px;
+  transform: translate(-50%, 0) rotate(45deg);
+  border-right: 1px solid #555e68;
+  border-bottom: 1px solid #555e68;
+  background: #17191c;
+  content: "";
+}
+
+[data-ui-tooltip]:hover::before,
+[data-ui-tooltip]:hover::after,
+[data-ui-tooltip]:focus-visible::before,
+[data-ui-tooltip]:focus-visible::after {
+  opacity: 1;
+  visibility: visible;
+  transition-delay: .42s, .42s, .42s;
+}
+
+[data-ui-tooltip]:hover::before,
+[data-ui-tooltip]:focus-visible::before {
+  transform: translate(-50%, 0);
+}
+
+/* 滚动条和窄宽度细化 */
+.content::-webkit-scrollbar,
+.text-font-results::-webkit-scrollbar,
+.words-preset-popup::-webkit-scrollbar {
+  width: 7px;
+}
+
+.content::-webkit-scrollbar-thumb,
+.text-font-results::-webkit-scrollbar-thumb,
+.words-preset-popup::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 6px;
+  background: #59616b;
+  background-clip: padding-box;
+}
+
+@media (max-width: 320px) {
+  .ui-section-kicker > small { display: none; }
+  .words-action-toolbar { grid-template-columns: repeat(6, minmax(27px, 1fr)); }
+  .common-tools-grid { column-gap: 5px !important; row-gap: 10px !important; }
+  .common-tool-icon { width: 44px !important; height: 42px !important; }
+  .ui-drawer-header span { display: none; }
+}
+
+@media (max-width: 286px) {
+  .ui-section-kicker { gap: 4px; }
+  .ui-section-kicker::after { min-width: 8px; }
+  .common-tool-label { font-size: 9px !important; }
+  .settings-service-actions { grid-template-columns: 1fr !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    transition-duration: .001ms !important;
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* 一级导航切换不显示悬浮提示；保留其他图标按钮的延迟提示。 */
+.panel-nav { overflow: hidden !important; }
+.nav-button::before,
+.nav-button::after {
+  display: none !important;
+  content: none !important;
+}
+
+/* v2.1.46：紧凑面板、右侧尺寸、输入框溢出修复与本地模型状态 */
+*, *::before, *::after { box-sizing: border-box; }
+
+/* 控件高度统一。排除颜色、复选框、单选框及开关，防止内容撑出按钮背景。 */
+.tool-panel input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
+.tool-panel select,
+.tool-panel .button,
+.tool-panel .mini-button,
+.tool-panel .tuniu-wide-button {
+  min-height: 29px;
+  max-height: 32px;
+  line-height: normal;
+}
+.tool-panel input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
+.tool-panel select {
+  height: 29px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+.words-metric-control input,
+.common-scale-control input,
+.tuniu-transform-fields input,
+.tuniu-two-fields input,
+.tuniu-inline-row input {
+  min-height: 0 !important;
+  height: 100% !important;
+  max-height: 100% !important;
+}
+
+/* 文档预设：名称左侧，尺寸固定靠右。 */
+.preset-card .preset-copy { width: 100%; min-width: 0; }
+.preset-card .preset-title-row {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+.preset-card .preset-title-row strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.preset-card .preset-size {
+  flex: 0 0 auto;
+  margin-left: auto !important;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* 文字面板：去标题后用轻分隔线建立节奏，整体更紧凑。 */
+.typography-panel .words-body-section { padding: 7px 8px 9px !important; }
+.words-font-color-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 55px;
+  align-items: center;
+  gap: 5px;
+}
+.words-color-compact {
+  height: 29px;
+  min-width: 0;
+  padding: 0 4px 0 5px !important;
+  border: 1px solid #1b1d20;
+  border-radius: 5px;
+  background: #303338;
+  font-size: 9px;
+}
+.words-color-compact input[type="color"] {
+  width: 24px !important;
+  height: 21px !important;
+  min-height: 21px !important;
+  margin-left: auto;
+}
+.words-weight-chips {
+  display: flex !important;
+  width: 100%;
+  margin: 5px 0 0 !important;
+  padding: 0 0 1px;
+  gap: 3px !important;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.words-weight-chips button {
+  flex: 1 1 27px;
+  min-width: 25px !important;
+  height: 27px !important;
+  padding: 0 !important;
+}
+.words-weight-chips button span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-size: 17px;
+  line-height: 1;
+}
+.words-public-tools,
+.words-action-toolbar,
+.words-align-grid,
+.words-hierarchy,
+.words-auto-layout-section {
+  margin-top: 6px !important;
+  padding-top: 6px !important;
+  border-top: 1px solid #45484d;
+}
+.words-metric-row { margin-top: 5px !important; gap: 5px !important; }
+.words-public-tools,
+.words-action-toolbar { gap: 3px !important; }
+.words-public-tools button,
+.words-action-toolbar button { height: 27px !important; }
+.words-inline-popover { margin-top: 5px !important; }
+.words-panel-header { min-height: 36px !important; }
+
+/* 常用功能顶部仅保留分隔线，不再使用四个线框容器。 */
+.common-zooms {
+  margin: 0 !important;
+  padding: 0 0 7px !important;
+  border: 0 !important;
+  border-bottom: 1px solid #484b50 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.common-align-row,
+.common-layout-row,
+.common-flip-row {
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 6px 0 !important;
+  border: 0 !important;
+  border-bottom: 1px solid #484b50 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.common-align-row::before,
+.common-layout-row::before,
+.common-flip-row::before { content: none !important; display: none !important; }
+.common-align-row button,
+.common-layout-row button,
+.common-flip-row button {
+  border-color: transparent !important;
+  background: transparent !important;
+}
+.common-align-row button:hover,
+.common-layout-row button:hover,
+.common-flip-row button:hover {
+  border-color: #51565e !important;
+  background: #373b41 !important;
+}
+.common-tools-grid { margin-top: 9px !important; row-gap: 9px !important; }
+.common-tool-item { position: relative !important; }
+.common-tool-more {
+  position: absolute !important;
+  top: 3px !important;
+  left: calc(50% + 6px) !important;
+  right: auto !important;
+  width: 17px !important;
+  height: 17px !important;
+  min-width: 17px !important;
+  min-height: 17px !important;
+  padding: 2px !important;
+  transform: none !important;
+  border: 0 !important;
+  border-radius: 3px !important;
+  background: rgba(18, 20, 23, .62) !important;
+  z-index: 4 !important;
+}
+.common-tool-more img { width: 12px !important; height: 12px !important; }
+.common-tool-more:hover { background: rgba(74,127,231,.78) !important; }
+
+/* 设置页：模型路径、进度与状态点。 */
+.settings-service-line { padding-left: 9px !important; }
+.settings-service-line .service-dot { margin-left: 2px; }
+.service-dot.standby {
+  background: #e8b64a !important;
+  box-shadow: 0 0 0 3px rgba(232,182,74,.12);
+}
+.settings-model-path-field { gap: 5px !important; }
+.settings-path-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  width: 100%;
+}
+.settings-path-row input { min-width: 0; }
+.settings-path-row .button { min-width: 88px; padding: 0 9px; }
+.settings-idle-field {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 92px;
+  align-items: center;
+  gap: 8px;
+}
+.model-download-progress {
+  width: 100%;
+  padding: 7px 8px;
+  border: 1px solid #444950;
+  border-radius: 6px;
+  background: #292c31;
+}
+.model-progress-copy {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+  color: #bfc4cb;
+  font-size: 10px;
+}
+.model-progress-copy span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.model-progress-copy strong { color: #eef2f8; font-size: 10px; }
+.model-progress-track {
+  position: relative;
+  width: 100%;
+  height: 5px;
+  overflow: hidden;
+  border-radius: 5px;
+  background: #1e2024;
+}
+.model-progress-track > span {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: #4a7fe7;
+  transition: width .16s ease;
+}
+.model-progress-track.indeterminate > span {
+  animation: xinyang-model-progress 1.1s ease-in-out infinite;
+}
+.model-progress-track.error > span { background: #e16b6b; }
+@keyframes xinyang-model-progress {
+  0% { transform: translateX(-115%); }
+  100% { transform: translateX(300%); }
+}
+
+@media (max-width: 320px) {
+  .settings-path-row { grid-template-columns: 1fr; }
+  .settings-path-row .button { width: 100%; }
+  .words-color-compact span { display: none; }
+  .words-font-color-row { grid-template-columns: minmax(0,1fr) 34px; }
+}
+
+/* v2.1.46：文字与常用功能输入框边界修复
+   全局 .tool-panel 输入框高度规则优先级较高，曾把嵌套输入框撑到 32px。
+   这里使用页面 ID 限定，确保内层控件严格服从外层容器尺寸。 */
+#typography-panel,
+#typography-panel .words-view,
+#typography-panel .words-body-section,
+#tools-panel,
+#tools-panel .common-tools-shell,
+#tools-panel .common-tools-parameter-drawer,
+#tools-panel .common-tools-parameter-drawer .tool-detail {
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+
+#typography-panel input,
+#typography-panel select,
+#typography-panel textarea,
+#tools-panel input,
+#tools-panel select,
+#tools-panel textarea {
+  box-sizing: border-box !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+
+/* 字号、行距、字距：输入框与箭头完整收进 27px 外框。 */
+#typography-panel .words-metric-control {
+  height: 27px !important;
+  min-height: 27px !important;
+  max-height: 27px !important;
+  grid-template-rows: 25px !important;
+  align-items: stretch !important;
+}
+#typography-panel .words-metric-control > input[type="number"] {
+  height: 25px !important;
+  min-height: 0 !important;
+  max-height: 25px !important;
+  margin: 0 !important;
+  padding: 0 1px !important;
+  align-self: stretch !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  line-height: 25px !important;
+  appearance: textfield;
+  -webkit-appearance: none;
+}
+#typography-panel .words-metric-control > input[type="number"]::-webkit-inner-spin-button,
+#typography-panel .words-metric-control > input[type="number"]::-webkit-outer-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+}
+#typography-panel .words-metric-control > .words-disclosure {
+  height: 25px !important;
+  min-height: 0 !important;
+  max-height: 25px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  align-self: stretch !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  line-height: 25px !important;
+}
+#typography-panel .words-metric-control > small,
+#typography-panel .words-metric-control > .words-metric-icon {
+  align-self: center !important;
+  line-height: 25px !important;
+}
+
+/* 常用功能顶部放大/缩小：输入框严格收进 22px 中部区域。 */
+#tools-panel .tuniu-z-input {
+  height: 24px !important;
+  min-height: 24px !important;
+  max-height: 24px !important;
+  overflow: hidden !important;
+}
+#tools-panel .tuniu-z-center {
+  height: 22px !important;
+  min-height: 0 !important;
+  max-height: 22px !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+}
+#tools-panel .tuniu-z-center > input {
+  width: 100% !important;
+  height: 22px !important;
+  min-height: 0 !important;
+  max-height: 22px !important;
+  margin: 0 !important;
+  padding: 0 1px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  line-height: 22px !important;
+  appearance: none;
+  -webkit-appearance: none;
+}
+#tools-panel .tuniu-z-left,
+#tools-panel .tuniu-z-right {
+  height: 22px !important;
+  min-height: 0 !important;
+  max-height: 22px !important;
+  margin: 0 !important;
+  align-self: stretch !important;
+}
+
+/* 常用功能展开参数：禁止网格子项和输入框突破抽屉内容宽度。 */
+#tools-panel .common-tools-parameter-drawer *,
+#tools-panel .common-tools-parameter-drawer label,
+#tools-panel .common-tools-parameter-drawer .tuniu-inline-row,
+#tools-panel .common-tools-parameter-drawer .tuniu-two-fields,
+#tools-panel .common-tools-parameter-drawer .tuniu-transform-fields,
+#tools-panel .common-tools-parameter-drawer .tuniu-export-row {
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+#tools-panel .common-tools-parameter-drawer input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
+#tools-panel .common-tools-parameter-drawer select,
+#tools-panel .common-tools-parameter-drawer textarea {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  height: 27px !important;
+  min-height: 0 !important;
+  max-height: 27px !important;
+  margin: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  line-height: 25px !important;
+}
+#tools-panel .common-tools-parameter-drawer textarea {
+  height: auto !important;
+  min-height: 52px !important;
+  max-height: none !important;
+  line-height: 16px !important;
+  padding-top: 6px !important;
+  padding-bottom: 6px !important;
+}
+#tools-panel .common-tools-parameter-drawer .tuniu-transform-fields label {
+  overflow: hidden !important;
+}
+#tools-panel .common-tools-parameter-drawer .tuniu-transform-fields label > input {
+  height: 25px !important;
+  max-height: 25px !important;
+}
+
+/* 导出折叠区已有左右 8px 外边距，直接子项不能再使用 100% 宽度。 */
+#tools-panel .tuniu-export-panel details > :not(summary) {
+  width: auto !important;
+  max-width: calc(100% - 16px) !important;
+}
+
+/* v2.1.46 · 百度通用文本翻译 设置 */
+.baidu-translator-card {
+  gap: 10px !important;
+}
+.settings-copy-with-status {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+.settings-copy-with-status > div:first-child {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+.baidu-translator-badge {
+  flex: 0 0 auto;
+  min-width: 48px;
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid var(--ui-border, #444);
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ui-text-muted, #999);
+  background: rgba(255,255,255,.025);
+  font-size: 10px;
+  line-height: 1;
+}
+.baidu-translator-badge.configured {
+  color: var(--ui-warning, #e8b64a);
+  border-color: rgba(232,182,74,.38);
+  background: rgba(232,182,74,.08);
+}
+.baidu-translator-badge.online {
+  color: var(--ui-success, #58b979);
+  border-color: rgba(88,185,121,.4);
+  background: rgba(88,185,121,.09);
+}
+.baidu-service-line {
+  min-height: 46px;
+}
+.baidu-secret-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto auto;
+  gap: 6px;
+  align-items: center;
+}
+.baidu-secret-row input {
+  min-width: 0;
+}
+.baidu-secret-toggle,
+.baidu-secret-clear {
+  height: 32px;
+  min-width: 42px;
+  padding: 0 8px;
+  border: 1px solid var(--ui-border, #444);
+  border-radius: 5px;
+  background: var(--ui-input, #252525);
+  color: var(--ui-text-secondary, #b9b9b9);
+  font: inherit;
+  cursor: pointer;
+}
+.baidu-secret-clear {
+  color: #d98989;
+}
+.baidu-secret-toggle:hover,
+.baidu-secret-clear:hover {
+  border-color: var(--ui-border-hover, #626262);
+  color: var(--ui-text, #f1f1f1);
+}
+.settings-field > span small {
+  color: var(--ui-text-muted, #858585);
+  font-size: 10px;
+  font-weight: 400;
+}
+.baidu-language-grid {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) minmax(0,1fr);
+  gap: 8px;
+}
+.baidu-language-grid .settings-field,
+.baidu-language-grid select {
+  min-width: 0;
+  width: 100%;
+}
+.baidu-settings-actions {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) minmax(0,1.15fr);
+  gap: 8px;
+}
+.baidu-settings-actions .button {
+  width: 100%;
+  min-width: 0;
+}
+.baidu-tutorial {
+  border-top: 1px solid var(--ui-border-soft, rgba(255,255,255,.08));
+  padding-top: 4px;
+}
+.baidu-tutorial summary {
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  color: var(--ui-text-secondary, #b9b9b9);
+  font-size: 11px;
+  cursor: pointer;
+  list-style: none;
+  outline: none;
+}
+.baidu-tutorial summary::-webkit-details-marker { display: none; }
+.baidu-tutorial summary::after {
+  content: "";
+  width: 7px;
+  height: 7px;
+  margin-left: auto;
+  margin-right: 3px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg) translateY(-2px);
+  transform-origin: center;
+  transition: transform 140ms ease;
+}
+.baidu-tutorial[open] summary::after {
+  transform: rotate(225deg) translate(-1px,-1px);
+}
+.baidu-tutorial-body {
+  padding: 4px 0 2px;
+  display: grid;
+  gap: 9px;
+}
+.baidu-tutorial-body ol {
+  margin: 0;
+  padding-left: 19px;
+  display: grid;
+  gap: 5px;
+  color: var(--ui-text-secondary, #b9b9b9);
+  font-size: 11px;
+  line-height: 1.55;
+}
+.baidu-tutorial-links {
+  display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 6px;
+}
+.baidu-tutorial-links button {
+  min-width: 0;
+  min-height: 30px;
+  padding: 5px 7px;
+  border: 1px solid var(--ui-border, #444);
+  border-radius: 5px;
+  background: rgba(255,255,255,.025);
+  color: var(--ui-text-secondary, #b9b9b9);
+  font: inherit;
+  font-size: 10px;
+  line-height: 1.35;
+  cursor: pointer;
+}
+.baidu-tutorial-links button:hover {
+  border-color: var(--ui-accent, #4a7fe7);
+  color: var(--ui-text, #f1f1f1);
+  background: rgba(74,127,231,.09);
+}
+@media (max-width: 315px) {
+  .baidu-language-grid,
+  .baidu-settings-actions,
+  .baidu-tutorial-links {
+    grid-template-columns: 1fr;
+  }
+  .baidu-secret-row {
+    grid-template-columns: minmax(0,1fr) auto;
+  }
+  .baidu-secret-clear {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+}
+
+
+/* v2.1.46：图牛式生成按钮映射与即时样式更新 */
+.words-button-options label { cursor: pointer; user-select: none; }
+.words-button-options input:checked + span { color: var(--ui-accent, #4a7fe7); }
+.words-button-panel .words-auto-padding-buttons button:active { transform: translateY(1px); }
+
+/* v2.1.59 调试报告 */
+.diagnostics-card {
+  gap: 10px;
+}
+.diagnostics-summary {
+  min-height: 30px;
+  padding: 8px 10px;
+  box-sizing: border-box;
+  border: 1px solid var(--ui-border, #444);
+  border-radius: 6px;
+  background: var(--ui-input-bg, #252525);
+  color: var(--ui-text-secondary, #b9b9b9);
+  font-size: 11px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.diagnostics-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+.diagnostics-actions .button {
+  min-width: 0;
+  height: 32px;
+  box-sizing: border-box;
+}
+.diagnostics-last-export {
+  min-height: 0;
+  margin: 0;
+  color: var(--ui-text-muted, #858585);
+  font-size: 10px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 310px) {
+  .diagnostics-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* v2.1.59 设置页手动重载：固定说明区与操作按钮，窄面板不溢出。 */
+.settings-reload-card {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+.settings-reload-card .settings-copy { min-width: 0; }
+.settings-reload-card #manual-reload-plugin {
+  min-width: 92px;
+  white-space: nowrap;
+}
+.settings-reload-card #manual-reload-plugin:disabled {
+  cursor: wait;
+  opacity: .72;
+}
+@media (max-width: 310px) {
+  .settings-reload-card {
+    grid-template-columns: 1fr;
+  }
+  .settings-reload-card #manual-reload-plugin {
+    width: 100%;
+  }
+}
+
+
+/* v2.1.59：窄面板与文字数值显示优化。 */
+#typography-panel .words-metric-control > input[type="number"] {
+  overflow: hidden !important;
+  text-overflow: clip !important;
+  white-space: nowrap !important;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 340px) {
+  #typography-panel .words-body-section {
+    padding-right: 6px !important;
+    padding-left: 6px !important;
+  }
+  #typography-panel .words-metric-row {
+    gap: 4px !important;
+  }
+  #typography-panel .words-metric-control {
+    grid-template-columns: 20px minmax(0, 1fr) auto 18px !important;
+  }
+  #typography-panel .words-metric-control > .words-disclosure {
+    width: 18px !important;
+  }
+  #typography-panel .words-metric-control > input[type="number"] {
+    padding-right: 0 !important;
+    padding-left: 0 !important;
+    font-size: 10px !important;
+  }
+  #typography-panel .words-public-tools,
+  #typography-panel .words-action-toolbar {
+    padding-right: 3px !important;
+    padding-left: 3px !important;
+    gap: 2px !important;
+  }
+}
+
+@media (max-width: 300px) {
+  #typography-panel .words-metric-control {
+    grid-template-columns: 19px minmax(0, 1fr) 17px !important;
+  }
+  #typography-panel .words-metric-control > small {
+    display: none !important;
+  }
+  #typography-panel .words-metric-control > .words-disclosure {
+    width: 17px !important;
+  }
+  #typography-panel .words-color-compact span {
+    display: none !important;
+  }
+  #typography-panel .words-font-color-row {
+    grid-template-columns: minmax(0, 1fr) 32px !important;
+  }
+}
+
+
+/* v2.1.64：文字数值预设面板始终限制在文字面板内部，避免压住左侧导航。 */
+#typography-panel .words-preset-popup {
+  box-sizing: border-box !important;
+  max-width: calc(100% - 8px);
+}
+
+
+/* v2.1.66：设置页窄宽度自适应，避免卡片、按钮和状态标签被右侧裁切。 */
+#settings-panel,
+#settings-panel > *,
+#settings-panel .settings-card,
+#settings-panel .settings-copy,
+#settings-panel .settings-field,
+#settings-panel .settings-service-copy,
+#settings-panel .settings-accordion,
+#settings-panel .baidu-tutorial,
+#settings-panel .baidu-tutorial-body {
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+
+#settings-panel {
+  width: 100% !important;
+  overflow-x: hidden !important;
+}
+
+#settings-panel .settings-card,
+#settings-panel .settings-accordion {
+  width: 100% !important;
+}
+
+#settings-panel .settings-copy span,
+#settings-panel .settings-service-copy small,
+#settings-panel .settings-hint,
+#settings-panel .diagnostics-summary,
+#settings-panel .diagnostics-last-export,
+#settings-panel .baidu-tutorial-body,
+#settings-panel .baidu-tutorial-body li {
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+}
+
+@media (max-width: 380px) {
+  #settings-panel {
+    gap: 6px !important;
+    padding: 0 6px 12px !important;
+  }
+
+  #settings-panel .ui-page-header {
+    min-width: 0 !important;
+    padding-right: 2px !important;
+    padding-left: 2px !important;
+  }
+
+  #settings-panel .settings-card,
+  #settings-panel .settings-accordion {
+    padding: 8px !important;
+  }
+
+  #settings-panel .settings-copy {
+    gap: 3px !important;
+  }
+
+  #settings-panel .settings-copy strong {
+    font-size: 11px !important;
+    line-height: 1.35 !important;
+  }
+
+  #settings-panel .settings-copy span {
+    font-size: 9px !important;
+    line-height: 1.45 !important;
+  }
+
+  /* 后台运行仍保留开关在右侧，但允许说明文字充分收缩。 */
+  #settings-panel .settings-primary-card {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) 38px !important;
+    align-items: center !important;
+    gap: 7px !important;
+  }
+
+  #settings-panel .settings-primary-card .switch {
+    justify-self: end !important;
+  }
+
+  /* 重载按钮、服务操作按钮改为整行，彻底消除右侧裁切。 */
+  #settings-panel .settings-reload-card {
+    grid-template-columns: minmax(0, 1fr) !important;
+    align-items: stretch !important;
+    gap: 7px !important;
+  }
+
+  #settings-panel .settings-reload-card #manual-reload-plugin,
+  #settings-panel .settings-service-actions .button,
+  #settings-panel .diagnostics-actions .button,
+  #settings-panel .baidu-settings-actions .button,
+  #settings-panel .settings-path-row .button {
+    width: 100% !important;
+    min-width: 0 !important;
+    white-space: normal !important;
+  }
+
+  #settings-panel .settings-copy-with-status {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 6px !important;
+  }
+
+  #settings-panel .baidu-translator-badge {
+    justify-self: start !important;
+    max-width: 100% !important;
+  }
+
+  #settings-panel .settings-service-line {
+    grid-template-columns: 10px minmax(0, 1fr) !important;
+    gap: 6px !important;
+    padding: 7px !important;
+  }
+
+  #settings-panel .settings-service-copy strong {
+    display: flex !important;
+    min-width: 0 !important;
+    flex-wrap: wrap !important;
+    row-gap: 3px !important;
+    white-space: normal !important;
+  }
+
+  #settings-panel .settings-service-copy strong span {
+    max-width: 100% !important;
+    white-space: normal !important;
+  }
+
+  #settings-panel .settings-service-copy small {
+    overflow: visible !important;
+    text-overflow: clip !important;
+    white-space: normal !important;
+    line-height: 1.4 !important;
+  }
+
+  #settings-panel .baidu-secret-row {
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    gap: 5px !important;
+  }
+
+  #settings-panel .baidu-secret-clear {
+    grid-column: 1 / -1 !important;
+    width: 100% !important;
+  }
+
+  #settings-panel .baidu-language-grid,
+  #settings-panel .baidu-settings-actions,
+  #settings-panel .baidu-tutorial-links,
+  #settings-panel .settings-path-row,
+  #settings-panel .settings-service-actions,
+  #settings-panel .diagnostics-actions {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  #settings-panel .settings-idle-field {
+    grid-template-columns: minmax(0, 1fr) !important;
+    align-items: stretch !important;
+    gap: 5px !important;
+  }
+
+  #settings-panel .settings-idle-field select,
+  #settings-panel .settings-field input,
+  #settings-panel .settings-field select,
+  #settings-panel .baidu-secret-row input {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  #settings-panel .baidu-tutorial-body ol {
+    padding-left: 17px !important;
+  }
+}
+
+@media (max-width: 320px) {
+  #settings-panel {
+    padding-right: 4px !important;
+    padding-left: 4px !important;
+  }
+
+  #settings-panel .settings-card,
+  #settings-panel .settings-accordion {
+    padding: 7px !important;
+  }
+
+  #settings-panel .settings-primary-card {
+    grid-template-columns: minmax(0, 1fr) 36px !important;
+    gap: 5px !important;
+  }
+}
+
+
+/* v2.1.82：字体选择器加宽、分类折叠与细滚动条。 */
+#typography-panel .words-font-results {
+  right: auto !important;
+  width: min(260px, calc(100vw - 50px)) !important;
+  min-width: 210px !important;
+  max-width: calc(100vw - 50px) !important;
+  max-height: min(330px, calc(100vh - 92px)) !important;
+}
+
+#typography-panel .words-font-category[hidden] {
+  display: none !important;
+}
+
+#typography-panel .words-font-category:not([hidden]) {
+  display: grid !important;
+}
+
+#typography-panel .words-font-category button.active {
+  border-color: #5b88d7 !important;
+  color: #fff !important;
+  background: #344866 !important;
+  box-shadow: inset 0 0 0 1px rgba(118, 161, 237, .14) !important;
+}
+
+#typography-panel .words-category-toggle .words-chevron-icon {
+  transition: transform .16s ease !important;
+}
+
+#typography-panel .words-category-toggle.open .words-chevron-icon {
+  transform: rotate(180deg) !important;
+}
+
+#typography-panel #words-font-result-list {
+  max-height: min(250px, calc(100vh - 170px)) !important;
+  padding-right: 3px !important;
+  scrollbar-width: thin;
+  scrollbar-color: #68717c transparent;
+}
+
+#typography-panel #words-font-result-list::-webkit-scrollbar {
+  width: 4px !important;
+  height: 4px !important;
+}
+
+#typography-panel #words-font-result-list::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+#typography-panel #words-font-result-list::-webkit-scrollbar-thumb {
+  min-height: 24px;
+  border: 0 !important;
+  border-radius: 4px !important;
+  background: #68717c !important;
+  background-clip: border-box !important;
+}
+
+#typography-panel #words-font-result-list::-webkit-scrollbar-thumb:hover {
+  background: #87919d !important;
+}
+
+#typography-panel .words-font-tabs {
+  grid-template-columns: minmax(52px, 1fr) minmax(52px, 1fr) minmax(66px, 1fr) !important;
+}
+
+#typography-panel .words-font-category {
+  grid-template-columns: repeat(4, minmax(42px, 1fr)) !important;
+}
+
+@media (max-width: 270px) {
+  #typography-panel .words-font-results {
+    width: calc(100vw - 46px) !important;
+    min-width: 188px !important;
+    max-width: calc(100vw - 46px) !important;
+  }
+  #typography-panel .words-font-category {
+    grid-template-columns: repeat(2, minmax(62px, 1fr)) !important;
+  }
+}
+
+
+/* v2.1.87：文字颜色改为调用 Photoshop 原生拾色器。 */
+.words-color-compact .words-ps-color-picker {
+  width: 26px;
+  height: 22px;
+  min-width: 26px;
+  min-height: 22px;
+  margin-left: auto;
+  padding: 2px;
+  border: 1px solid #151515;
+  border-radius: 4px;
+  background: #36393e;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.05);
+  cursor: pointer;
+}
+.words-color-compact .words-ps-color-picker:hover,
+.words-color-compact .words-ps-color-picker:focus-visible {
+  border-color: #6f91c5;
+  background: #41464d;
+  outline: none;
+}
+.words-color-compact .words-ps-color-picker:disabled {
+  opacity: .55;
+  cursor: wait;
+}
+.words-color-compact .words-ps-color-picker > i {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 2px;
+  background: #fff;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.28), 0 0 0 1px rgba(255,255,255,.08);
+}

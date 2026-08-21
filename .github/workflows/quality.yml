@@ -1,0 +1,43 @@
+name: Static quality checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  javascript-syntax:
+    name: JavaScript syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Check browser JavaScript
+        shell: bash
+        run: |
+          set -euo pipefail
+          find js -type f -name '*.js' -print0 | xargs -0 -n1 node --check
+          find guide-native guideguide-panel -type f -name '*.js' -print0 | xargs -0 -n1 node --check
+
+  extension-structure:
+    name: Extension structure
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate required files and manifest XML
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f index.html
+          test -f CSXS/manifest.xml
+          test -f js/runtime.js
+          test -f jsx/host.jsx
+          python - <<'PY'
+          import xml.etree.ElementTree as ET
+          ET.parse('CSXS/manifest.xml')
+          print('manifest XML: OK')
+          PY

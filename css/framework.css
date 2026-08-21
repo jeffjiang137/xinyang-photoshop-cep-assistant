@@ -1,0 +1,451 @@
+/* v2.1.29 图牛自定义框架一级页面 */
+html[data-initial-panel="framework-panel"] #framework-panel {
+  display: block;
+}
+
+html[data-initial-panel="framework-panel"] .nav-button[data-panel="framework-panel"] {
+  color: #fff;
+  background: #3b3b3b;
+  font-weight: 650;
+}
+
+html[data-initial-panel="framework-panel"] .nav-button[data-panel="framework-panel"] .nav-main-icon {
+  opacity: 1;
+}
+
+html[data-initial-panel="framework-panel"] .nav-button[data-panel="framework-panel"]::after {
+  position: absolute;
+  top: 7px;
+  right: -3px;
+  bottom: 7px;
+  width: 2px;
+  border-radius: 2px 0 0 2px;
+  background: #6fa2ff;
+  content: "";
+}
+
+.framework-panel {
+  margin: -8px;
+  width: calc(100% + 16px) !important;
+  max-width: none !important;
+  color: #d7d7d7;
+  background: #303030;
+}
+
+.framework-page,
+.framework-page * {
+  box-sizing: border-box;
+}
+
+.framework-page button,
+.framework-page input {
+  font: inherit;
+}
+
+.framework-page button {
+  min-height: 0 !important;
+  border: 0;
+  outline: 0;
+}
+
+.framework-page input {
+  min-height: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+}
+
+.framework-page-tab {
+  display: flex;
+  height: 36px;
+  align-items: flex-end;
+  padding: 0 10px;
+  border-bottom: 1px solid #242424;
+  background: #303030;
+}
+
+.framework-page-tab button {
+  position: relative;
+  height: 35px;
+  padding: 0 12px;
+  color: #d7d7d7;
+  background: transparent;
+  font-size: 11px;
+}
+
+.framework-page-tab button.active::after {
+  position: absolute;
+  right: 8px;
+  bottom: 0;
+  left: 8px;
+  height: 2px;
+  background: #304ffe;
+  content: "";
+}
+
+.framework-scroll {
+  min-height: 100%;
+  padding-bottom: 12px;
+}
+
+.framework-top-tabs {
+  display: flex;
+  padding: 10px 7px;
+}
+
+.framework-top-tabs button {
+  width: 33.333%;
+  height: 26px;
+  margin: 3px;
+  border-radius: 13px;
+  color: #d7d7d7;
+  background: #424242;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.framework-top-tabs button:hover {
+  background: #383838;
+}
+
+.framework-top-tabs button.active {
+  color: #fff;
+  background: #304ffe !important;
+}
+
+.framework-space {
+  padding: 0 6px;
+}
+
+.framework-field-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.framework-field-row-two > * {
+  min-width: 0;
+  flex: 1 1 0;
+}
+
+.framework-input-component {
+  display: flex;
+  width: 100%;
+  height: 26px;
+  min-width: 0;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: #424242;
+}
+
+.framework-input-component.active,
+.framework-input-component:focus-within {
+  border-color: #304ffe;
+}
+
+.framework-input-left {
+  display: flex;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  align-items: center;
+  justify-content: center;
+}
+
+.framework-input-left img {
+  width: 16px;
+  height: 16px;
+  opacity: .92;
+  pointer-events: none;
+}
+
+.framework-input-component input {
+  width: calc(100% - 24px);
+  height: 24px !important;
+  padding: 0 6px;
+  color: #d7d7d7 !important;
+  background: transparent !important;
+  font-size: 11px;
+  line-height: 24px;
+}
+
+.framework-input-component input::placeholder {
+  color: #787878;
+}
+
+.framework-lines {
+  margin-top: 2px;
+}
+
+.framework-list {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 8px;
+}
+
+.framework-line-main {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.framework-line-height {
+  width: 72px;
+  min-width: 72px;
+}
+
+.framework-height-mini {
+  display: flex;
+  width: 30px;
+  height: 26px;
+  flex: 0 0 30px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  color: #9c9c9c;
+  background: transparent;
+  cursor: pointer;
+}
+
+.framework-height-mini:hover {
+  color: #fff;
+  background: #3c3c3c;
+}
+
+.framework-height-mini img {
+  width: 16px;
+  height: 16px;
+  opacity: .82;
+}
+
+.framework-option {
+  display: flex;
+  width: 34px;
+  height: 26px;
+  flex: 0 0 34px;
+  align-items: center;
+  justify-content: space-between;
+  visibility: hidden;
+}
+
+.framework-list:hover .framework-option,
+.framework-list:focus-within .framework-option {
+  visibility: visible;
+}
+
+.framework-option button {
+  display: flex;
+  width: 14px;
+  height: 14px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: #424242;
+  background: #727272;
+  cursor: pointer;
+}
+
+.framework-option button:hover[data-frame-line-action="add"] {
+  color: #fff;
+  background: #304ffe;
+}
+
+.framework-option button:hover[data-frame-line-action="remove"] {
+  color: #fff;
+  background: #f03030;
+}
+
+.framework-option img {
+  width: 8px;
+  height: 8px;
+  pointer-events: none;
+}
+
+.framework-title-size-row {
+  margin-top: 2px;
+}
+
+.framework-text-type {
+  display: grid;
+  grid-template-columns: repeat(6, 24px);
+  justify-content: space-between;
+  row-gap: 7px;
+  margin-bottom: 8px;
+}
+
+.framework-text-type button,
+.framework-text-placeholder {
+  width: 24px;
+  height: 24px;
+  border-radius: 2px;
+}
+
+.framework-text-type button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #9c9c9c;
+  background: transparent;
+  cursor: pointer;
+}
+
+.framework-text-type button.active,
+.framework-text-type button:hover {
+  border: 1px solid #727272;
+  color: #d7d7d7;
+  background: #424242;
+}
+
+.framework-text-type button img {
+  width: 22px;
+  height: 22px;
+  opacity: .84;
+  pointer-events: none;
+}
+
+.framework-text-type button.active img,
+.framework-text-type button:hover img {
+  opacity: 1;
+}
+
+.framework-text-placeholder {
+  visibility: hidden;
+}
+
+.framework-button-group {
+  margin: 0 10px;
+  padding: 10px;
+  border-top: 1px solid #3b3b3b;
+}
+
+.framework-bottom {
+  margin-bottom: 10px;
+  border-radius: 14px;
+}
+
+.framework-button-group button {
+  width: 100%;
+  height: 28px;
+  border-radius: 14px;
+  color: #797979;
+  background: #484848;
+}
+
+.framework-button-group button:not(:disabled) {
+  cursor: pointer;
+}
+
+.framework-button-group .framework-bottom button.is-active,
+.framework-button-group .framework-bottom button:not(:disabled) {
+  color: #c8c8c8;
+  background: #666;
+}
+
+.framework-button-group .framework-bottom:hover button:not(:disabled) {
+  background: #424242;
+}
+
+.framework-button-group .framework-bottom button.has-data {
+  color: #fff !important;
+  background: #304ffe !important;
+}
+
+.framework-reset {
+  color: #9c9c9c !important;
+  background: transparent !important;
+}
+
+.framework-reset:hover {
+  color: #304ffe !important;
+}
+
+.framework-helper {
+  border-top: 1px solid #242424;
+}
+
+.framework-helper-title {
+  display: flex;
+  width: 100%;
+  height: 38px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  color: #9c9c9c;
+  background: transparent;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.framework-helper-title:hover {
+  color: #d7d7d7;
+  background: #343434;
+}
+
+.framework-helper-title img {
+  width: 10px;
+  height: 10px;
+  transition: transform .2s ease;
+}
+
+.framework-helper-title[aria-expanded="true"] img {
+  transform: rotate(90deg);
+}
+
+.framework-helper-body {
+  padding: 2px 12px 10px;
+  color: #9c9c9c;
+  font-size: 10px;
+}
+
+.framework-helper-row {
+  display: grid;
+  grid-template-columns: 14px 58px minmax(0, 1fr);
+  gap: 6px;
+  align-items: start;
+  padding: 5px 0;
+  border-top: 1px solid rgba(255,255,255,.04);
+  line-height: 1.45;
+}
+
+.framework-helper-row:first-child {
+  border-top: 0;
+}
+
+.framework-helper-row b {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  color: #d7d7d7;
+  background: #727272;
+  font-size: 8px;
+  font-weight: 400;
+  line-height: 12px;
+  text-align: center;
+}
+
+.framework-helper-row code {
+  color: #d7d7d7;
+  font-family: Consolas, monospace;
+  white-space: nowrap;
+}
+
+@media (max-width: 286px) {
+  .framework-option {
+    visibility: visible;
+  }
+  .framework-text-type {
+    grid-template-columns: repeat(6, 22px);
+  }
+  .framework-text-type button,
+  .framework-text-placeholder {
+    width: 22px;
+    height: 22px;
+  }
+}

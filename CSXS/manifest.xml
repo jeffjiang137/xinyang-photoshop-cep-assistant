@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ExtensionManifest Version="7.0"
+  ExtensionBundleId="com.jeffjiang.ecommerce-design-assistant-cep"
+  ExtensionBundleVersion="2.2.69"
+  ExtensionBundleName="鑫洋助理"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <ExtensionList>
+    <Extension Id="com.jeffjiang.ecommerce-design-assistant-cep.panel" Version="2.2.69" />
+  </ExtensionList>
+  <ExecutionEnvironment>
+    <HostList>
+      <Host Name="PHXS" Version="[16.0,99.9]" />
+      <Host Name="PHSP" Version="[16.0,99.9]" />
+    </HostList>
+    <LocaleList>
+      <Locale Code="All" />
+    </LocaleList>
+    <RequiredRuntimeList>
+      <RequiredRuntime Name="CSXS" Version="6.0" />
+    </RequiredRuntimeList>
+  </ExecutionEnvironment>
+  <DispatchInfoList>
+    <Extension Id="com.jeffjiang.ecommerce-design-assistant-cep.panel">
+      <DispatchInfo>
+        <Resources>
+          <MainPath>./index.html</MainPath>
+          <!--
+            宿主脚本由 js/runtime.js 在 CEP 面板启动后串行加载。
+            保留 manifest ScriptPath 会在面板初始化前自动执行 host.jsx；
+            一旦模块加载失败，CEP ExtendScript 引擎会持续返回 error code 38，
+            后续 version-probe 和重载都无法获得可诊断的返回值。
+          -->
+          <CEFCommandLine>
+            <Parameter>--enable-nodejs</Parameter>
+            <Parameter>--mixed-context</Parameter>
+            <Parameter>--allow-file-access-from-files</Parameter>
+          </CEFCommandLine>
+        </Resources>
+        <Lifecycle>
+          <AutoVisible>true</AutoVisible>
+        </Lifecycle>
+        <UI>
+          <Type>Panel</Type>
+          <Menu>鑫洋助理</Menu>
+          <Geometry>
+            <Size>
+              <Height>620</Height>
+              <Width>320</Width>
+            </Size>
+            <MinSize>
+              <Height>360</Height>
+              <Width>272</Width>
+            </MinSize>
+            <MaxSize>
+              <Height>2000</Height>
+              <Width>1200</Width>
+            </MaxSize>
+          </Geometry>
+          <Icons>
+            <Icon Type="Normal">./assets/icon.png</Icon>
+            <Icon Type="RollOver">./assets/icon.png</Icon>
+            <Icon Type="DarkNormal">./assets/icon.png</Icon>
+            <Icon Type="DarkRollOver">./assets/icon.png</Icon>
+          </Icons>
+        </UI>
+      </DispatchInfo>
+    </Extension>
+  </DispatchInfoList>
+</ExtensionManifest>
