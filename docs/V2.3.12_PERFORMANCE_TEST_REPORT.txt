@@ -1,0 +1,79 @@
+# 鑫洋助理 CEP / Bridge 性能优化报告
+
+日期：2026-10-10；Photoshop 27.3.1；鑫洋助理 2.3.12。本次是同版本模块补丁，runtime.js / host.jsx / manifest / index.html / diagnostics.js 的版本引用保持原先一致值。
+
+## 当前状态
+
+- 已完成并验证：代码审查、Node 模拟与本机 HTTP 回归、真实 Photoshop 独立文档宿主测试、性能重复测量、回读、文字单步撤销、失败事务文字/显隐回滚、智能对象替换、嵌套重名与隐藏锁定层选择、导出文件像素一致性。
+- 磁盘部署状态以 logs/deployment-manifest.json 为准；verified-on-disk 表示文件已替换并通过 SHA256 校验。
+- 尚未在当前 CEP 会话激活：用户有两个业务文档打开，保留现会话；不重启 Photoshop，不重载面板。候选宿主模块已通过 COM 独立测试，这不等于当前面板已加载新代码。
+- 用户要求本轮结束后暂停测试：已完成当前轮并在 finally 中关闭测试文档、恢复原活动文档。后续不调用 Photoshop、不继续测试。无后台测试服务。
+
+## 有证据的调用与瓶颈
+
+外部请求 → 本机 HTTP /execute → service.execute → TaskManager 排队/锁/健康与内存检查 → XinyangRuntime.hostInvoke('toolsBridgeExecute') → CSInterface.evalScript → LongStitchCEP 方法表 → photoshopBridge 工厂 → Photoshop DOM / Action Manager。
+
+1. 原 xinyangBridgeFind 会先通过 xinyangBridgeLayers 读取整棵树、所有层边界和文字信息，再第二次递归取得实际 DOM 对象。对一个目标层也会触发无关的昂贵属性访问；many 属性修改内部重复调用，造成约 O(请求图层数 × 全文档层数) 访问。
+2. 逐个 upsert_text / replace_smart_object / export HTTP 请求分别进入锁、健康检查、内存采样及宿主队列。service.sampleMemory 会启动 PowerShell 查询进程，逐请求开销不能忽略；本次保留资源保护，不通过跳过保护提高数字。
+3. 既有 execute_batch 已一次索引并合并历史。对于已使用此入口的文字和智能对象操作，本次没有证据支持大幅进一步提速。
+4. 原 BatchExecutor 初次快照未传 documentId，有取错活动文档的风险；校验使用累计 dirty 列表，会重复读取之前批次的层。已改为显式文档快照与本批次校验，累计 dirty 状态仍用于保存和预览。
+5. 面板 toolsBatchRenameLayers / toolsFindSimilarLayers / toolsSmartObject / toolsBatchExport 本来就是一项任务一个 hostInvoke，不把它们误报成逐层 CEP 往返。toolsFindSimilarLayers 的签名读取会无条件计算边界，即使只按名称/类型匹配；现只在 size 条件下读取尺寸。
+6. 历史选项下，显隐变化不能可靠依靠 activeHistoryState 恢复。这是实测的事务可靠性问题；候选批次保留显隐前值，失败时额外恢复。成功批次的普通 Ctrl+Z 显隐行为仍受 Photoshop 历史选项控制，未改变用户该选项。
+
+## 实际代码修改
+
+| 文件 | 改动与原因 |
+|---|---|
+| jsx/modules/bridge/commands.jsx | 单层直接递归定位；many 请求仅建立一次临时 DOM 索引；请求结束清理索引，不跨文档缓存；新增 select_layers / find_layers_many / export_many；选择保持隐藏层显隐；导出预检、拒绝覆盖及重复路径、返回部分完成清单；失败批次补充显隐恢复；错误行用于诊断 |
+| jsx/modules/tools/layer-tools.jsx | 只有匹配 size 时才读取图层边界，名称/类型查找减少无关属性访问 |
+| js/modules/bridge/runtime/batch-executor.js | 快照指定目标文档；仅校验当前批次涉及图层；保留累计 dirty；智能对象批次使用 SMART_OBJECT 重任务资源跟踪，即使 mode=SAFE |
+| js/modules/bridge/service.js | upsert_text_many / replace_smart_objects 归一化到现有事务批次；明确 documentId、输入校验，限制每批 30 文字 / 5 智能对象；保留错误 details |
+| js/modules/bridge/batch-client.js | 新增可复用调用客户端：文字/显隐每批 30、智能对象每批 5、导出每批 3；串行处理；回读失败停止；不自动重试写操作；不输出令牌 |
+
+未修改核心 Adobe 文件、插件界面、字体、预设、其他插件、安全软件、电源/驱动或进程调度；未关闭或保存用户业务文档。新接口仍走现有 toolsBridgeExecute / LongStitchCEP，不新增私有跨模块入口。备份及候选文件位于本目录。
+
+## 性能对比与测试条件
+
+同一个独立 A-main.psd，800×800，47 层，30 个文字、4 个智能对象，约 9.82MiB；测试不保存来源。保留原始 Windows / Photoshop 设置，原用户两个文档打开。最终对比采用日志 round 7/8/9，每项旧、新各 3 次，中位数如下；此前 round 0 为预热，中间失败/中间版本记录保留但不用于本表。
+
+| 操作 | 原模块中位数 | 新模块中位数 | 耗时变化 |
+|---|---:|---:|---:|
+| 10 次目标图层读取 | 3.434s | 0.724s | 下降 78.9% |
+| 30 个文字：已有批量入口 | 2.302s | 2.547s | 增加 10.6% |
+| 30 个图层显隐：已有 many 入口 | 11.492s | 1.746s | 下降 84.8% |
+| 4 个智能对象变换 | 1.224s | 1.236s | 增加 1.0% |
+| 3 次全画布 JPG 导出 | 0.860s | 0.762s | 下降 11.4% |
+
+这些是同机实际 Photoshop 宿主模块执行时间，通过 COM 执行相同模块，计时在脚本内部；不包含外部 HTTP 往返，也不是整套电商业务耗时。导出测试对比原有三个 export 操作与一个 export_many，二者都在同一次 COM 测试调用内，不能把此数字当成减少三个 HTTP 往返的收益。
+
+已批量化文字在完整场景出现 10.6% 增时，因此追加同文档、重置同一内容、交替旧新顺序对照（预热 1 轮，有效 3 轮）：旧 2.363s，新 2.366s，相差约 0.1%。未确认文字批次持续退化，不把文字列为本次提速收益。智能对象变换基本相当；导出有波动，不承诺稳定 11.4% 提升。
+
+主要确认收益是查找与 many 显隐。对于外部逐字/逐层调用，新客户端在 HTTP 回归中把 61 次文字调用变为 3 批（30/30/1）、40 次显隐变为 2 批、6 次智能对象替换变为 2 批（5/1）；这是已验证的调用数量变化，尚未做部署后完整 CEP 端到端业务耗时测试。
+
+9 对最终 JPG 均为 800×800，逐像素一致；见 logs/summary.json。候选模块还实测 4 个智能对象替换后仍是智能对象、文字单步撤销、失败显隐批次恢复、嵌套重名匹配、隐藏锁定层选择和导出第二项失败时返回第一项完成清单。
+
+## 兼容性与未测试项目
+
+新增 exact name 查找返回所有重名匹配，不猜测唯一目标；写操作应使用已核实的 layerId。索引仅存活于本次命令，结构变更按原逻辑失效重建。选择接口最多 100 IDs，查找最多 100 queries，导出宿主接口最多 10 项，客户端默认每批 3 项，失败停止。
+
+Bridge export_layer 原语义是按图层边界裁剪文档合成图，并非隔离单层；export_many 中带 layerId 沿用此语义，未悄悄改变。原生切片、画板与面板批量导出仍用已有接口；未重写这些业务模块。
+
+未测试：部署后 CEP 面板重载、当前会话新接口、真实大型业务 PSD、790px 详情页/1920px 首页本次改动专项、原生切片全链路、长期运行内存趋势、面板视觉验收。普通显隐 Ctrl+Z 依赖用户历史选项，保留原配置；失败事务额外恢复已验证。COM 与 CEP 属于不同脚本环境，独立宿主测试不替代正式会话验收。
+
+## 生效、调用与回滚
+
+保存自己的工作后，正常关闭并启动 Photoshop、打开鑫洋助理桥接，才能加载磁盘新代码。用户已要求暂停测试，本轮不自动执行上述动作。
+
+新接口请求均经原 /execute，鉴权沿用现令牌；令牌不得写入日志。详见 Usage.md。文字和智能对象批量接口 require documentId；客户端所有操作要求显式 documentId。
+
+回滚：在正常退出 Photoshop 后运行本目录 rollback.ps1。脚本先检查现文件是否仍为本次部署哈希；若已被用户更新则停止，避免覆盖新工作；恢复原 4 个修改文件，删除本次新增客户端/测试报告文件，再核对备份 SHA256。只删除清单中本次新增的两个文件，不递归删除目录。然后正常启动 Photoshop。备份完整性与部署状态见 logs/deployment-manifest.json。
+
+## 证据位置
+
+- tests/regression.js：模拟宿主、真实本机 HTTP、批次分块与错误处理测试；未连接 Photoshop。
+- logs/live-cases.jsonl / host-benchmark.jsonl：真实 PS 测试成功与失败记录，保留中间兼容问题证据。
+- logs/text-controlled.jsonl：文字交替顺序复测；logs/extra-host.json：最终兼容性回归。
+- logs/summary.json：最终性能中位数、原始样本、导出一致性。
+- logs/deployment-manifest.json：原值/新值以文件哈希记录；backup/：修改前代码。
+
+测试初始化曾发现 COM 全局与 CEP 全局不共享，改为每例在一次 COM 调用中完成；一次初始化遗留的任务自有 A-main.psd 已无保存关闭并恢复原文档。真实宿主发现嵌套条件表达式兼容问题，改为显式分支并通过最终重复测试。另一次 COM 明确返回 RPC_E_SERVERCALL_RETRYLATER，表示调用未开始，待空闲后执行成功。没有强制结束 Photoshop。

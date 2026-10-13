@@ -18,6 +18,7 @@ XinyangHostModules.stitchSlice = function (deps) {
         var displayFileName = deps.displayFileName;
         var fileObject = deps.fileObject;
         var fillDocumentWhite = deps.fillDocumentWhite;
+        var exportNativeArtboards = deps.exportNativeArtboards;
         var findLayerById = deps.findLayerById;
         var initializeSpacingState = deps.initializeSpacingState;
         var integerValue = deps.integerValue;
@@ -1303,13 +1304,9 @@ XinyangHostModules.stitchSlice = function (deps) {
             if (!layer || layer.typename !== "LayerSet") return null;
             try {
                 app.activeDocument = document;
-                document.activeLayer = layer;
+                // Read by ID: activating a hidden group can reveal it before export.
                 var reference = new ActionReference();
-                reference.putEnumerated(
-                    stringIDToTypeID("layer"),
-                    stringIDToTypeID("ordinal"),
-                    stringIDToTypeID("targetEnum")
-                );
+                reference.putIdentifier(stringIDToTypeID("layer"), layer.id);
                 var descriptor = executeActionGet(reference);
                 var enabledKey = stringIDToTypeID("artboardEnabled");
                 if (!descriptor.hasKey(enabledKey) || !descriptor.getBoolean(enabledKey)) return null;
@@ -1354,21 +1351,15 @@ XinyangHostModules.stitchSlice = function (deps) {
 
         function collectDocumentArtboards(document) {
             var previousDocument = app.activeDocument;
-            var selectedIds = [];
             var output = [];
             try {
                 app.activeDocument = document;
-                try { selectedIds = selectedLayerIds(); } catch (ignoreSelectedArtboards) {}
                 var index;
                 for (index = 0; index < document.layers.length; index += 1) {
                     var item = sliceArtboardInfo(document, document.layers[index], output.length + 1);
                     if (item) output.push(item);
                 }
             } finally {
-                try {
-                    app.activeDocument = document;
-                    if (selectedIds.length) selectLayersByIds(selectedIds);
-                } catch (ignoreRestoreArtboardSelection) {}
                 try { app.activeDocument = previousDocument; } catch (ignoreRestoreArtboardDocument) {}
             }
             output.sort(function (left, right) {
@@ -1383,6 +1374,31 @@ XinyangHostModules.stitchSlice = function (deps) {
             /* 单个覆盖整张画布的切片，无论来源字段是否可用，导出结果都等同当前画布。 */
             return item.left <= 0 && item.top <= 0 &&
                 item.right >= canvasWidth && item.bottom >= canvasHeight;
+        }
+
+        function removeCanvasSliceWhenExportingMultiple(slices, canvasWidth, canvasHeight) {
+            if (!slices || slices.length < 2) return slices || [];
+
+            var hasPartialSlice = false;
+            var index;
+            for (index = 0; index < slices.length; index += 1) {
+                var item = slices[index];
+                if (item.left > 0 || item.top > 0 || item.right < canvasWidth || item.bottom < canvasHeight) {
+                    hasPartialSlice = true;
+                    break;
+                }
+            }
+            if (!hasPartialSlice) return slices;
+
+            /* Photoshop 会附带一张覆盖画布的自动切片。只要存在实际切片，
+             * 该项导出后就是多余的整张长图，必须排除。 */
+            var output = [];
+            for (index = 0; index < slices.length; index += 1) {
+                item = slices[index];
+                if (item.left <= 0 && item.top <= 0 && item.right >= canvasWidth && item.bottom >= canvasHeight) continue;
+                output.push(item);
+            }
+            return output;
         }
 
         function sliceSafeFileName(value, fallback) {
@@ -1405,6 +1421,40 @@ XinyangHostModules.stitchSlice = function (deps) {
                 if (serial > 10000) throw new Error("同名导出文件过多，请清理导出目录");
             }
             return file;
+        }
+
+        /*
+         * 保留原文档每一层（含组）的可见性，再在临时副本中合并。避免
+         * 某些 Photoshop 版本的 duplicate(name, true) 将隐藏图层带入导出。
+         */
+        function copySliceLayerVisibility(sourceContainer, targetContainer) {
+            var count = Math.min(sourceContainer.layers.length, targetContainer.layers.length);
+            var index;
+            for (index = 0; index < count; index += 1) {
+                var sourceLayer = sourceContainer.layers[index];
+                var targetLayer = targetContainer.layers[index];
+                if (
+                    sourceLayer.typename === "LayerSet" &&
+                    targetLayer.typename === "LayerSet"
+                ) {
+                    copySliceLayerVisibility(sourceLayer, targetLayer);
+                }
+                // Restore parents last so child visibility cannot reveal a hidden group.
+                try { targetLayer.visible = !!sourceLayer.visible; } catch (ignoreCopySliceVisibility) {}
+            }
+        }
+
+        function duplicateForSliceExport(sourceDocument, name) {
+            var temporary = sourceDocument.duplicate(name);
+            try {
+                copySliceLayerVisibility(sourceDocument, temporary);
+            } catch (error) {
+                // The caller cannot close a duplicate that was never returned.
+                try { temporary.close(SaveOptions.DONOTSAVECHANGES); } catch (ignoreCloseFailedDuplicate) {}
+                try { app.activeDocument = sourceDocument; } catch (ignoreRestoreSource) {}
+                throw error;
+            }
+            return temporary;
         }
 
         function sliceSaveForWebJpeg(document, outputFile, quality) {
@@ -1488,6 +1538,7 @@ XinyangHostModules.stitchSlice = function (deps) {
                     slices = [];
                     sliceReadFallback = true;
                 }
+                slices = removeCanvasSliceWhenExportingMultiple(slices, canvasWidth, canvasHeight);
             }
             var mode = "slices";
             if (artboards.length) {
@@ -1497,8 +1548,9 @@ XinyangHostModules.stitchSlice = function (deps) {
                 slices = [];
             }
 
-            /* 单张结果直接导出至用户所选文件夹；多张结果才建立批次子文件夹。 */
+            /* 仅单张正方形结果直出“主图”；其余结果保持批次子文件夹结构。 */
             var plannedOutputCount = mode === "canvas" ? 1 : 0;
+            var singleSquareExport = mode === "canvas" && canvasWidth === canvasHeight;
             var outputIndex;
             var sourceItems = mode === "artboards" ? artboards : slices;
             if (mode !== "canvas") {
@@ -1508,9 +1560,13 @@ XinyangHostModules.stitchSlice = function (deps) {
                         sourceItems[outputIndex].bottom > sourceItems[outputIndex].top
                     ) {
                         plannedOutputCount += 1;
+                        singleSquareExport = plannedOutputCount === 1 &&
+                            sourceItems[outputIndex].right - sourceItems[outputIndex].left ===
+                            sourceItems[outputIndex].bottom - sourceItems[outputIndex].top;
                     }
                 }
             }
+            singleSquareExport = plannedOutputCount === 1 && singleSquareExport;
 
             var baseExportFolderName = mode === "artboards"
                 ? "画板导出"
@@ -1518,7 +1574,7 @@ XinyangHostModules.stitchSlice = function (deps) {
             var exportFolderName = baseExportFolderName;
             var exportFolder = selectedFolder;
             var folderSerial = 2;
-            if (plannedOutputCount !== 1) {
+            if (!singleSquareExport) {
                 exportFolder = new Folder(selectedFolder.fsName + "/" + exportFolderName);
                 while (exportFolder.exists) {
                     exportFolderName = baseExportFolderName + "_" + folderSerial;
@@ -1541,40 +1597,22 @@ XinyangHostModules.stitchSlice = function (deps) {
             try {
                 app.displayDialogs = DialogModes.NO;
                 app.preferences.rulerUnits = Units.PIXELS;
-                flattenedSource = sourceDocument.duplicate("__鑫洋切片导出源__", true);
-                try {
-                    if (flattenedSource.mode !== DocumentMode.RGB) flattenedSource.changeMode(ChangeMode.RGB);
-                } catch (ignoreSliceExportMode) {}
-                try { flattenedSource.bitsPerChannel = BitsPerChannelType.EIGHT; } catch (ignoreSliceExportBits) {}
+                if (mode !== "artboards") {
+                    flattenedSource = duplicateForSliceExport(sourceDocument, "__鑫洋切片导出源__");
+                    try {
+                        if (flattenedSource.mode !== DocumentMode.RGB) flattenedSource.changeMode(ChangeMode.RGB);
+                    } catch (ignoreSliceExportMode) {}
+                    try { flattenedSource.bitsPerChannel = BitsPerChannelType.EIGHT; } catch (ignoreSliceExportBits) {}
+                }
 
                 var index;
                 if (mode === "canvas") {
                     app.activeDocument = flattenedSource;
-                    var canvasFile = sliceUniqueOutputFile(exportFolder, "画布", "jpg");
+                    var canvasFile = sliceUniqueOutputFile(exportFolder, singleSquareExport ? "主图" : "画布", "jpg");
                     sliceSaveForWebJpeg(flattenedSource, canvasFile, webQuality);
                     exportedFiles.push(canvasFile.name);
                 } else if (mode === "artboards") {
-                    for (index = 0; index < artboards.length; index += 1) {
-                        var board = artboards[index];
-                        if (!(board.right > board.left && board.bottom > board.top)) continue;
-                        app.activeDocument = flattenedSource;
-                        outputDocument = flattenedSource.duplicate("__画板_" + (index + 1) + "__", true);
-                        outputDocument.crop([
-                            UnitValue(board.left, "px"),
-                            UnitValue(board.top, "px"),
-                            UnitValue(board.right, "px"),
-                            UnitValue(board.bottom, "px")
-                        ]);
-                        var boardFile = sliceUniqueOutputFile(
-                            exportFolder,
-                            sliceSafeFileName(board.name, "画板_" + (index + 1)),
-                            "jpg"
-                        );
-                        sliceSaveForWebJpeg(outputDocument, boardFile, webQuality);
-                        exportedFiles.push(boardFile.name);
-                        outputDocument.close(SaveOptions.DONOTSAVECHANGES);
-                        outputDocument = null;
-                    }
+                    exportedFiles = exportNativeArtboards(sourceDocument, exportFolder, webQuality, singleSquareExport);
                 } else {
                     for (index = 0; index < slices.length; index += 1) {
                         var item = slices[index];
@@ -1585,14 +1623,14 @@ XinyangHostModules.stitchSlice = function (deps) {
                         if (!(right > left && bottom > top)) continue;
 
                         app.activeDocument = flattenedSource;
-                        outputDocument = flattenedSource.duplicate("__切片_" + (index + 1) + "__", true);
+                        outputDocument = duplicateForSliceExport(flattenedSource, "__切片_" + (index + 1) + "__");
                         outputDocument.crop([
                             UnitValue(left, "px"),
                             UnitValue(top, "px"),
                             UnitValue(right, "px"),
                             UnitValue(bottom, "px")
                         ]);
-                        var outputFile = sliceUniqueOutputFile(exportFolder, "切片_" + (exportedFiles.length + 1), "jpg");
+                        var outputFile = sliceUniqueOutputFile(exportFolder, singleSquareExport ? "主图" : "切片_" + (exportedFiles.length + 1), "jpg");
                         sliceSaveForWebJpeg(outputDocument, outputFile, webQuality);
                         exportedFiles.push(outputFile.name);
                         outputDocument.close(SaveOptions.DONOTSAVECHANGES);
@@ -1611,7 +1649,7 @@ XinyangHostModules.stitchSlice = function (deps) {
                     format: "jpg",
                     quality: webQuality,
                     sourceFolder: selectedFolder.fsName,
-                    usedSourceFolderDirectly: plannedOutputCount === 1,
+                    usedSourceFolderDirectly: singleSquareExport,
                     sliceReadFallback: sliceReadFallback
                 };
             } finally {

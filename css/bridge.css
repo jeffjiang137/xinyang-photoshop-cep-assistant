@@ -1,0 +1,24 @@
+/* Bridge styles stay within the primary bridge panel. */
+#bridge-panel .bridge-heading .bridge-state { font-size:11px !important; padding:4px 8px; border:1px solid #555; border-radius:12px; color:#aaa !important; white-space:nowrap; }
+#bridge-panel .bridge-heading .bridge-state[data-ready="true"] { color:#88dfb5 !important; background:#20372e; border-color:#3b7058; }
+#bridge-panel .bridge-card { margin-bottom:12px; padding:12px; border:1px solid #454545; border-radius:8px; background:#2c2c2c; }
+#bridge-panel .bridge-card h3 { margin:0 0 10px; font-size:12px; color:#ddd; }
+#bridge-panel .bridge-address { display:block; font-size:12px; color:#dedede; user-select:text; overflow-wrap:anywhere; margin:6px 0 12px; }
+#bridge-panel .bridge-actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+#bridge-panel button { min-height:32px; font-size:12px; border-radius:5px; }
+#bridge-panel .bridge-primary { background:#e3ad57; color:#201a12; border-color:#e3ad57; font-weight:600; }
+#bridge-panel button:disabled { opacity:.4; cursor:default; }
+#bridge-panel .bridge-hint { color:#a6a6a6; line-height:1.7; font-size:11px; margin:10px 0 0; }
+#bridge-panel .bridge-message { font-size:12px; line-height:1.65; margin:0 0 12px; color:#b8c9dc; overflow-wrap:anywhere; }
+#bridge-panel .bridge-message.is-error { color:#f0aa9f; }
+#bridge-panel dl { display:grid; grid-template-columns:54px minmax(0,1fr); gap:8px; font-size:11px; margin:0 0 12px; }
+#bridge-panel dt { color:#999; } #bridge-panel dd { margin:0; overflow-wrap:anywhere; color:#ddd; }
+#bridge-panel pre { white-space:pre-wrap; overflow-wrap:anywhere; max-height:240px; overflow:auto; font-size:11px; line-height:1.5; user-select:text; }
+html[data-initial-panel="bridge-panel"] #bridge-panel { display:block; }
+html[data-initial-panel="bridge-panel"] .nav-button[data-panel="bridge-panel"] { color:#e3ad57; background:#3e3528; }
+#bridge-panel button { padding:6px 5px; white-space:nowrap; }
+/* Keep all ten primary entries reachable at the CEP minimum height. */
+@media (max-height:440px) {
+  .panel-nav .nav-button { height:28px !important; min-height:28px !important; flex:0 0 28px !important; }
+  .panel-nav .nav-main-icon { width:20px !important; height:20px !important; }
+}

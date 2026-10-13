@@ -234,6 +234,8 @@ XinyangHostModules.ocrHost = function (deps) {
 
         function preferredAvailableFont(fonts, preferredFamily, weight) {
             var preferred = normalizedFontToken(preferredFamily);
+            // OCR 可返回具体字重的 PostScript 名，先还原字体族再选字重。
+            preferred = preferred.replace(/(?:extralight|ultralight|semibold|demibold|extrabold|ultrabold|regular|normal|medium|black|heavy|bold|light|thin|book)$/, "");
             if (!preferred || preferred.length < 3) return "";
             var keys = [];
             var key;
@@ -253,8 +255,12 @@ XinyangHostModules.ocrHost = function (deps) {
                     result += requested === "black" ? 90 : requested === "bold" ? 35 : -20;
                 } else if (/semibold|demibold|bold/.test(value)) {
                     result += requested === "bold" ? 80 : requested === "black" ? 55 : -8;
-                } else if (/regular|normal|book|light|thin/.test(value)) {
+                } else if (/regular|normal|book/.test(value)) {
                     result += requested === "regular" ? 70 : -18;
+                } else if (/medium/.test(value)) {
+                    result += requested === "regular" ? 45 : 20;
+                } else if (/light|thin/.test(value)) {
+                    result += requested === "regular" ? 10 : -40;
                 }
                 result -= Math.abs(normalizedFontToken(value).length - preferred.length) * 0.05;
                 return result;
@@ -273,9 +279,8 @@ XinyangHostModules.ocrHost = function (deps) {
             return false;
         }
 
-        function resolveOcrFont(fonts, style, weight, text, preferredFamily,
+        function resolveOcrWeight(weight, text,
                 weightScore, fontHeight, weightValue) {
-            var serif = style === "serif";
             var requestedWeight = String(weight || "regular").toLowerCase();
             var numericWeight = safeNumber(weightValue, 0);
             var density = safeNumber(weightScore, 0);
@@ -326,6 +331,14 @@ XinyangHostModules.ocrHost = function (deps) {
                 requestedWeight = "regular";
             }
 
+            return requestedWeight;
+        }
+
+        function resolveOcrFont(fonts, style, weight, text, preferredFamily,
+                weightScore, fontHeight, weightValue) {
+            var serif = style === "serif";
+            var requestedWeight = resolveOcrWeight(weight, text,
+                weightScore, fontHeight, weightValue);
             /* 只使用开源字体族：思源、Noto、阿里普惠和 HarmonyOS Sans。
                不让 OCR 的系统/商业字体提示带入最终 Photoshop 文本图层。 */
             var preferred = isCompatibleOcrFamily(preferredFamily, serif)
@@ -440,8 +453,51 @@ XinyangHostModules.ocrHost = function (deps) {
          * 只用字号与 tracking 匹配识别框。禁止对文字图层执行 resize，
          * 保证 horizontalScale / verticalScale 始终为 100%，避免字体变形。
          */
+        function fitVerticalOcrTypography(layer, item, box, resolution) {
+            var targetWidth = Math.max(1, safeNumber(box.width, 1));
+            var targetHeight = Math.max(1, safeNumber(box.height, 1));
+            var points = textPointSize(item, targetWidth * 72 / resolution);
+            var measured;
+            var iteration;
+            // 竖排用列宽拟合字形，整列高度只用于字间距，绝不当作单字字号。
+            for (iteration = 0; iteration < 5; iteration += 1) {
+                measured = layerSize(layer);
+                if (!(measured.width > 0)) break;
+                var ratio = targetWidth / measured.width;
+                if (Math.abs(ratio - 1) <= 0.025) break;
+                points = clampNumber(points * clampNumber(ratio, 0.25, 4), 1, 1296);
+                setTextPointSize(item, points);
+            }
+            var gaps = Math.max(0, String(item.contents || "").replace(/[\uDC00-\uDFFF]/g, "").length - 1);
+            var limits = textTrackingLimits(String(item.contents || ""));
+            measured = layerSize(layer);
+            if (gaps > 0 && measured.height > 0) {
+                var emPixels = Math.max(0.1, textPointSize(item, points) * resolution / 72);
+                item.tracking = clampNumber(Math.round(
+                    (targetHeight - measured.height) * 1000 / (gaps * emPixels)
+                ), limits.minimum, limits.maximum);
+            }
+            // 字距达到下限也不允许文字越出列框，只等比缩小，不拉伸字形。
+            measured = layerSize(layer);
+            if (measured.height > targetHeight * 1.025 || measured.width > targetWidth * 1.025) {
+                setTextPointSize(item, clampNumber(textPointSize(item, points) * Math.min(
+                    targetHeight / Math.max(1, measured.height),
+                    targetWidth / Math.max(1, measured.width), 1
+                ), 1, 1296));
+            }
+            if (Math.abs(box.angle) > 0.1 && Math.abs(box.angle) <= 180) {
+                layer.rotate(box.angle, AnchorPosition.MIDDLECENTER);
+            }
+            measured = layerSize(layer);
+            layer.translate(box.x - measured.left, box.y - measured.top);
+        }
+
         function fitTextLayerTypography(layer, item, box, resolution) {
             resolution = Math.max(1, safeNumber(resolution, 72));
+            if (box.textDirection === "vertical") {
+                fitVerticalOcrTypography(layer, item, box, resolution);
+                return;
+            }
             var measured = layerSize(layer);
             if (!(measured.width > 0 && measured.height > 0)) return;
 
@@ -451,11 +507,8 @@ XinyangHostModules.ocrHost = function (deps) {
                 1,
                 safeNumber(box.fontHeight, safeNumber(box.height, measured.height))
             );
-            /* OCR 字框通常只覆盖实体笔画，不包含字体 em 框上下留白。
-               中文按实测笔画高度略微补偿，避免生成后视觉字号偏小。 */
-            targetHeight *= containsCjkForFit ? 1.065 : 1.025;
+            // layerSize 与像素分析均为可见笔画边界，无需再次补偿 em 留白。
             var targetWidth = Math.max(1, safeNumber(box.width, measured.width));
-            if (containsCjkForFit) targetWidth *= 1.045;
             var targetTop = safeNumber(box.y, 0) + Math.max(
                 0,
                 (safeNumber(box.height, targetHeight) - targetHeight) / 2
@@ -505,7 +558,7 @@ XinyangHostModules.ocrHost = function (deps) {
             /*
              * 字间距达到下限后仍放不下时，只等比减小字号，不做横向压缩。
              */
-            var widthTolerance = containsCjkForFit ? 1.11 : 1.055;
+            var widthTolerance = 1.025;
             if (measured.width > targetWidth * widthTolerance) {
                 points = textPointSize(item, points) *
                     clampNumber(
@@ -560,15 +613,17 @@ XinyangHostModules.ocrHost = function (deps) {
                         : "sans";
             var weight = String(line.weight || "regular").toLowerCase();
             if (weight !== "black" && weight !== "bold") weight = "regular";
+            weight = resolveOcrWeight(weight, line.text, line.weightScore,
+                line.fontHeight || line.height, line.weightValue);
             var font = resolveOcrFont(
                 fonts,
                 style,
                 weight,
                 line.text,
                 line.fontFamily,
-                line.weightScore,
+                0,
                 line.fontHeight || line.height,
-                line.weightValue
+                0
             );
             var layer = root.artLayers.add();
             layer.kind = LayerKind.TEXT;
@@ -578,11 +633,16 @@ XinyangHostModules.ocrHost = function (deps) {
 
             var item = layer.textItem;
             item.kind = TextType.POINTTEXT;
+            // 显式设置横竖排，避免继承 Photoshop 上一次文字工具的方向。
+            item.direction = line.textDirection === "vertical" ? Direction.VERTICAL : Direction.HORIZONTAL;
             item.contents = String(line.text || "");
             item.font = font;
             item.size = UnitValue(
                 clampNumber(
-                    safeNumber(line.height, 18) * 72 / Math.max(1, resolution) * 1.12,
+                    (line.textDirection === "vertical"
+                        ? Math.min(safeNumber(line.width, 18), safeNumber(line.fontHeight, 18))
+                        : safeNumber(line.fontHeight, safeNumber(line.height, 18))) *
+                        72 / Math.max(1, resolution) * 1.12,
                     1,
                     1296
                 ),
@@ -595,6 +655,9 @@ XinyangHostModules.ocrHost = function (deps) {
             } catch (ignoreTextScale) {}
             try {
                 item.tracking = 0;
+                item.fauxBold = false;
+                item.fauxItalic = false;
+                item.baselineShift = UnitValue(0, "pt");
             } catch (ignoreInitialTracking) {}
             item.position = [
                 UnitValue(safeNumber(line.x, 0), "px"),
@@ -624,7 +687,8 @@ XinyangHostModules.ocrHost = function (deps) {
                     1,
                     safeNumber(line.fontHeight, safeNumber(line.height, 1))
                 ),
-                angle: safeNumber(line.angle, 0)
+                angle: safeNumber(line.angle, 0),
+                textDirection: line.textDirection || "horizontal"
             }, resolution);
             return {
                 layer: layer,
@@ -1160,40 +1224,98 @@ XinyangHostModules.ocrHost = function (deps) {
         function eraseBackgroundColor(document, box) {
             var width = pixels(document.width);
             var height = pixels(document.height);
-            var offset = Math.max(4, Math.min(24, Math.round(Math.min(box.width, box.height) * 0.18)));
-            var points = [
-                [box.x - offset, box.y + box.height / 2],
-                [box.x + box.width + offset, box.y + box.height / 2],
-                [box.x + box.width / 2, box.y - offset],
-                [box.x + box.width / 2, box.y + box.height + offset]
-            ];
-            var reds = [], greens = [], blues = [], index;
-            for (index = 0; index < points.length; index += 1) {
-                var x = Math.max(0, Math.min(width - 1, Math.round(points[index][0])));
-                var y = Math.max(0, Math.min(height - 1, Math.round(points[index][1])));
+            var offset = Math.max(2, Math.min(8, Math.round(Math.min(box.width, box.height) * 0.06)));
+            var fractions = [0.2, 0.35, 0.5, 0.65, 0.8];
+            var sides = { left: [], right: [], top: [], bottom: [] };
+            var sideNames = ["left", "right", "top", "bottom"];
+            var sideIndex;
+            var fractionIndex;
+
+            function readSample(x, y) {
+                if (x < 0 || y < 0 || x >= width || y >= height) return null;
                 var sampler = null;
                 try {
-                    sampler = document.colorSamplers.add([UnitValue(x, "px"), UnitValue(y, "px")]);
+                    sampler = document.colorSamplers.add([
+                        UnitValue(Math.round(x), "px"), UnitValue(Math.round(y), "px")
+                    ]);
                     var rgb = sampler.color.rgb;
-                    reds.push(Number(rgb.red));
-                    greens.push(Number(rgb.green));
-                    blues.push(Number(rgb.blue));
+                    return [Number(rgb.red), Number(rgb.green), Number(rgb.blue)];
                 } catch (ignoreColorSampler) {
+                    return null;
                 } finally {
                     if (sampler) {
                         try { sampler.remove(); } catch (ignoreSamplerRemove) {}
                     }
                 }
             }
-            if (!reds.length) throw new Error("无法读取文字周边的背景颜色");
-            reds.sort(function (a, b) { return a - b; });
-            greens.sort(function (a, b) { return a - b; });
-            blues.sort(function (a, b) { return a - b; });
-            var middle = Math.floor(reds.length / 2);
+
+            function medianColor(colors) {
+                if (!colors.length) return null;
+                var channels = [[], [], []];
+                var colorIndex;
+                var channelIndex;
+                for (colorIndex = 0; colorIndex < colors.length; colorIndex += 1) {
+                    for (channelIndex = 0; channelIndex < 3; channelIndex += 1) {
+                        channels[channelIndex].push(colors[colorIndex][channelIndex]);
+                    }
+                }
+                var result = [];
+                for (channelIndex = 0; channelIndex < 3; channelIndex += 1) {
+                    channels[channelIndex].sort(function (a, b) { return a - b; });
+                    var middle = Math.floor(channels[channelIndex].length / 2);
+                    result.push(channels[channelIndex].length % 2
+                        ? channels[channelIndex][middle]
+                        : (channels[channelIndex][middle - 1] + channels[channelIndex][middle]) / 2);
+                }
+                return result;
+            }
+
+            for (sideIndex = 0; sideIndex < sideNames.length; sideIndex += 1) {
+                var side = sideNames[sideIndex];
+                for (fractionIndex = 0; fractionIndex < fractions.length; fractionIndex += 1) {
+                    var fraction = fractions[fractionIndex];
+                    var sampleX = side === "left" ? box.x - offset
+                        : side === "right" ? box.x + box.width + offset
+                        : box.x + box.width * fraction;
+                    var sampleY = side === "top" ? box.y - offset
+                        : side === "bottom" ? box.y + box.height + offset
+                        : box.y + box.height * fraction;
+                    var colorSample = readSample(sampleX, sampleY);
+                    if (colorSample) sides[side].push(colorSample);
+                }
+            }
+
+            var sideColors = {};
+            for (sideIndex = 0; sideIndex < sideNames.length; sideIndex += 1) {
+                sideColors[sideNames[sideIndex]] = medianColor(sides[sideNames[sideIndex]]);
+            }
+            var estimates = [];
+            function addOpposingEstimate(first, second) {
+                if (first && second) {
+                    estimates.push([
+                        (first[0] + second[0]) / 2,
+                        (first[1] + second[1]) / 2,
+                        (first[2] + second[2]) / 2
+                    ]);
+                } else if (first || second) {
+                    estimates.push(first || second);
+                }
+            }
+            addOpposingEstimate(sideColors.left, sideColors.right);
+            addOpposingEstimate(sideColors.top, sideColors.bottom);
+            if (!estimates.length) throw new Error("无法读取文字周边的背景颜色");
+
             var color = new SolidColor();
-            color.rgb.red = reds[middle];
-            color.rgb.green = greens[middle];
-            color.rgb.blue = blues[middle];
+            var totals = [0, 0, 0];
+            var estimateIndex;
+            for (estimateIndex = 0; estimateIndex < estimates.length; estimateIndex += 1) {
+                totals[0] += estimates[estimateIndex][0];
+                totals[1] += estimates[estimateIndex][1];
+                totals[2] += estimates[estimateIndex][2];
+            }
+            color.rgb.red = totals[0] / estimates.length;
+            color.rgb.green = totals[1] / estimates.length;
+            color.rgb.blue = totals[2] / estimates.length;
             return color;
         }
 
@@ -1391,6 +1513,7 @@ XinyangHostModules.ocrHost = function (deps) {
             var candidateIndex;
             for (candidateIndex = 0; candidateIndex < candidates.length; candidateIndex += 1) {
                 var candidate = candidates[candidateIndex];
+                if (!candidate.clean) continue;
                 document.activeLayer = sourceLayer;
                 selectRectangle(document, candidate);
                 try {
@@ -1403,6 +1526,7 @@ XinyangHostModules.ocrHost = function (deps) {
                     try { document.selection.deselect(); } catch (ignoreCandidateDeselect) {}
                 }
             }
+            if (!fallback) throw new Error("文字附近没有可用于拉伸的干净像素");
             document.activeLayer = sourceLayer;
             selectRectangle(document, fallback);
             try {
@@ -1448,6 +1572,15 @@ XinyangHostModules.ocrHost = function (deps) {
                 canvasHeight,
                 sourceBounds
             );
+            if (avoidBoxes && avoidBoxes.length) {
+                var avoidIndex;
+                for (avoidIndex = 0; avoidIndex < avoidBoxes.length; avoidIndex += 1) {
+                    if (rectanglesOverlapWithPadding(fallback, avoidBoxes[avoidIndex], 0)) {
+                        fallback = null;
+                        break;
+                    }
+                }
+            }
             var picked = pasteStretchSample(document, sourceLayer, candidates, fallback);
             var patch = picked.patch;
             var sample = picked.sample;

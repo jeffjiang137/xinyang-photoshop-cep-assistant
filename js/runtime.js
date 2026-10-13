@@ -8,7 +8,7 @@
    * v2.2.58 曾在按需加载改造期间缓存过不完整的 LongStitchCEP，
    * 拼图入口最容易因此停留在旧方法表。
    */
-  var VERSION = "2.2.69";
+  var VERSION = "2.3.20";
   var cs = new CSInterface();
   var modulePromises = {};
   var loadedModules = {};
@@ -37,6 +37,7 @@
   };
 
   var PANEL_MODULES = {
+    "bridge-panel": ["photoshopBridge"],
     "framework-panel": ["framework"],
     "document-panel": ["toolsImportExport", "toolsTransform", "tools"],
     "typography-panel": ["baiduTranslator", "toolsTypography", "tools"],
@@ -55,6 +56,7 @@
   };
 
   var MODULE_PATHS = {
+    photoshopBridge: "js/modules/bridge/panel.js?v=" + VERSION,
     framework: "js/framework.js?v=" + VERSION,
     tools: "js/tools.js?v=" + VERSION,
     commonTools: "js/common-tools-v217.js?v=" + VERSION,
@@ -680,7 +682,7 @@
           {
             method: task.method,
             rawLength: rawText.length,
-            rawPreview: rawText.slice(0, 240),
+            rawPreview: task.method === "toolsBridgeExecute" ? "[bridge response omitted]" : rawText.slice(0, 240),
             scriptLength: script.length,
             payloadLength: json ? json.length : 0,
             taskId: task.id
@@ -906,5 +908,33 @@
       error: error
     });
   });
+  var bridgeAutoStartAttempted = false;
+  function startBridgeOnReady() {
+    if (bridgeAutoStartAttempted) return;
+    bridgeAutoStartAttempted = true;
+    if (!window.__adobe_cep__ || safeStorageGet("longStitch.bridgeAutoStart") === "0") return;
+    var stage = "host-script";
+    ensureHostScript(false).then(function () {
+      if (safeStorageGet("longStitch.bridgeAutoStart") === "0") return null;
+      stage = "bridge-module";
+      return ensurePanelModule("bridge-panel");
+    }).then(function (ready) {
+      if (ready === null || safeStorageGet("longStitch.bridgeAutoStart") === "0") return;
+      if (!window.XinyangBridge || typeof window.XinyangBridge.start !== "function") {
+        throw new Error("PS 桥接启动入口不可用");
+      }
+      stage = "bridge-start";
+      return window.XinyangBridge.start().then(function () {
+        diagnosticLog("info", "runtime.bridge.autostart.success", "PS 桥接已自动启动", {});
+      });
+    }).catch(function (error) {
+      diagnosticLog("error", "runtime.bridge.autostart.failure", "PS 桥接自动启动失败", {
+        stage: stage,
+        error: error
+      });
+    });
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", startBridgeOnReady);
+  else startBridgeOnReady();
   warmBackgroundModules();
 }());

@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ExtensionManifest Version="7.0"
   ExtensionBundleId="com.jeffjiang.ecommerce-design-assistant-cep"
-  ExtensionBundleVersion="2.2.69"
+  ExtensionBundleVersion="2.3.20"
   ExtensionBundleName="鑫洋助理"
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <ExtensionList>
-    <Extension Id="com.jeffjiang.ecommerce-design-assistant-cep.panel" Version="2.2.69" />
+    <Extension Id="com.jeffjiang.ecommerce-design-assistant-cep.panel" Version="2.3.20" />
   </ExtensionList>
   <ExecutionEnvironment>
     <HostList>
@@ -38,6 +38,10 @@
         </Resources>
         <Lifecycle>
           <AutoVisible>true</AutoVisible>
+          <StartOn>
+            <Event>applicationActivate</Event>
+            <Event>documentAfterActivate</Event>
+          </StartOn>
         </Lifecycle>
         <UI>
           <Type>Panel</Type>

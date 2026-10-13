@@ -193,16 +193,6 @@ var XinyangEmbedLowerV2202 = $.global.XinyangEmbedLowerV2202 = (function () {
         }
     }
 
-    function pasteInPlace(document) {
-        try {
-            executeAction(stringIDToTypeID("pasteInPlace"), undefined, DialogModes.NO);
-            return document.activeLayer;
-        } catch (ignorePasteInPlace) {
-            var pasted = document.paste();
-            return pasted || document.activeLayer;
-        }
-    }
-
     function createDownwardClippingMask(document, layer) {
         document.activeLayer = layer;
         try {
@@ -317,21 +307,12 @@ var XinyangEmbedLowerV2202 = $.global.XinyangEmbedLowerV2202 = (function () {
             try { document.activeLayer = lowerAnchor; }
             catch (activateLowerError) { throw new Error("无法激活当前图层视觉下方的可见内容"); }
 
-            /* 盖印整个视觉下层到临时新层，再用最初源图层的真实像素选区硬裁。
-               与 Copy Merged 相比，这一步不依赖剪贴板，也不会因为活动层隐藏而失败。 */
+            /* 盖印保留画布坐标；选区复制后粘贴会在某些宿主中偏移。 */
             try {
                 lowerComposite = stampVisibleToNewLayer(document);
                 lowerComposite.name = "__鑫洋助理_视觉下层临时合成__";
             } catch (stampError) {
-                /* 少数宿主若不支持 duplicate=true 的 Merge Visible，再回退到
-                   “可见下层作为活动层 + Copy Merged”。 */
-                restoreSelectionChannel(document, selectionChannel);
-                try {
-                    document.selection.copy(true);
-                    lowerComposite = null;
-                } catch (copyError) {
-                    throw new Error("当前图层选区内没有可复制的视觉下层内容");
-                }
+                throw new Error("无法在原画布位置生成视觉下层内容");
             }
         } finally {
             for (index = visibilityState.length - 1; index >= 0; index -= 1) {
@@ -341,14 +322,8 @@ var XinyangEmbedLowerV2202 = $.global.XinyangEmbedLowerV2202 = (function () {
 
         try { document.selection.deselect(); } catch (ignoreDeselect) {}
         var copied = lowerComposite;
-        if (!copied) {
-            document.activeLayer = source;
-            copied = pasteInPlace(document);
-            if (!copied || copied.typename !== "ArtLayer") throw new Error("Photoshop 未能粘贴视觉下层内容");
-        }
 
-        /* 不论来自“盖印可见图层”还是 Copy Merged 回退，最后都严格使用
-           最初源图层的真实像素选区硬裁，因此新图层本身只保留当前图层范围。 */
+        /* 严格使用最初源图层的真实像素选区硬裁。 */
         hardCropLayerToSelection(document, copied, selectionChannel);
         if (!hasVisiblePixels(document, copied)) {
             try { copied.remove(); } catch (ignoreRemoveEmptyComposite) {}

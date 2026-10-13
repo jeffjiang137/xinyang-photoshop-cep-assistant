@@ -21,7 +21,11 @@ var XinyangHostScriptFile = File($.fileName);
         "modules/core/shared.jsx",
         "modules/core/layers.jsx",
         "modules/core/colors.jsx",
-        "modules/tools/layer-tools.jsx"
+        "modules/tools/layer-tools.jsx",
+        "modules/tools/memory-snap.jsx",
+        "modules/tools/smart-snap.jsx",
+        "modules/tools/canvas-align.jsx",
+        "modules/tools/text-align.jsx"
     ]);
     /* 拼图是首屏主流程；先在宿主启动阶段解析，避免首次 invoke 时
      * ExtendScript 对大型业务 JSX 的动态 evalFile 只返回 code 38。 */
@@ -875,7 +879,8 @@ var LongStitchCEP = (function () {
         var axis = String(wordsOptionValue(options, ["axis", "direction", "type"], "horizontal"));
         if (axis === "h" || axis === "x" || axis === "horizontalCenter") axis = "horizontal";
         if (axis === "v" || axis === "y" || axis === "verticalCenter") axis = "vertical";
-        return toolsCenterLayersOnCanvas({ axis: axis });
+        if (axis === "top") return toolsAlignLayersToCanvasTop();
+        return axis === "vertical" ? toolsCenterLayersVerticallyOnCanvas() : toolsCenterLayersHorizontallyOnCanvas();
     }
     function translateTextReplace(options) {
         options = options || {};
@@ -925,13 +930,19 @@ var LongStitchCEP = (function () {
     var toolSolidColorFromHex = coreColorsModule.toolSolidColorFromHex;
 
     XinyangHostLoadStage = "layer-tools-init";
+    var textAlignModule = XinyangHostModules.textAlign({
+        activeLayerId: activeLayerId,
+        selectLayersByIds: selectLayersByIds
+    });
     var layerToolsModule = XinyangHostModules.layerTools({
         pixels: pixels,
         layerSize: layerSize,
         integerValue: integerValue,
+        tryAlignTextLayers: textAlignModule.tryAlignTextLayers,
         activeLayerId: activeLayerId,
         selectedLayerIds: selectedLayerIds,
         selectLayersByIds: selectLayersByIds,
+        toolLayersByIdsWithoutSelection: toolLayersByIdsWithoutSelection,
         layerNumericId: layerNumericId,
         suspendToolsHistory: suspendToolsHistory,
         toolArrayContains: toolArrayContains,
@@ -983,7 +994,17 @@ var LongStitchCEP = (function () {
     var toolsSmartObject = layerToolsModule.toolsSmartObject;
     var toolsScaleLayers = layerToolsModule.toolsScaleLayers;
     var toolsAlignLayers = layerToolsModule.toolsAlignLayers;
-    var toolsCenterLayersOnCanvas = layerToolsModule.toolsCenterLayersOnCanvas;
+    var canvasAlignModule = XinyangHostModules.canvasAlign({
+        pixels: pixels,
+        selectedLayerIds: selectedLayerIds,
+        selectLayersByIds: selectLayersByIds,
+        suspendToolsHistory: suspendToolsHistory
+    });
+    var toolsCenterLayersOnCanvas = canvasAlignModule.toolsCenterLayersOnCanvas;
+    var toolsAlignLayersToCanvasTop = canvasAlignModule.toolsAlignLayersToCanvasTop;
+    var toolsCenterLayersHorizontallyOnCanvas = canvasAlignModule.toolsCenterLayersHorizontallyOnCanvas;
+    var toolsCenterLayersVerticallyOnCanvas = canvasAlignModule.toolsCenterLayersVerticallyOnCanvas;
+    var toolsCenterLayersVerticallyOnCanvasV2309 = canvasAlignModule.toolsCenterLayersVerticallyOnCanvasV2309;
     var toolsDistributeLayersEvenly = layerToolsModule.toolsDistributeLayersEvenly;
     var toolSetColorOverlay = layerToolsModule.toolSetColorOverlay;
     var toolFillNormalLayerPixels = layerToolsModule.toolFillNormalLayerPixels;
@@ -994,7 +1015,8 @@ var LongStitchCEP = (function () {
     var toolSnapPointDimension = layerToolsModule.toolSnapPointDimension;
     var toolGetVectorMaskPathPlain = layerToolsModule.toolGetVectorMaskPathPlain;
     var toolSetVectorMaskPathPlain = layerToolsModule.toolSetVectorMaskPathPlain;
-    var toolsApplySmartSnap = layerToolsModule.toolsApplySmartSnap;
+    var toolsApplySmartSnap = XinyangHostModules.smartSnap({ pixels: pixels, selectedLayerIds: selectedLayerIds, selectLayersByIds: selectLayersByIds, suspendToolsHistory: suspendToolsHistory }).toolsApplySmartSnap;
+    var memorySnapModule = XinyangHostModules.memorySnap();
     var toolsSnapShapeAnchors = layerToolsModule.toolsSnapShapeAnchors;
     var toolShapeAppearanceInfo = layerToolsModule.toolShapeAppearanceInfo;
     var toolPutNativeStrokeDefaults = layerToolsModule.toolPutNativeStrokeDefaults;
@@ -1239,6 +1261,10 @@ var LongStitchCEP = (function () {
         pixels: pixels, safeLayerName: safeLayerName, saveSpacingState: saveSpacingState,
         saveStitchSourceState: saveStitchSourceState, selectLayersByIds: selectLayersByIds,
         selectedLayerIds: selectedLayerIds, twoDigits: twoDigits,
+        exportNativeArtboards: function (document, folder, quality, singleSquare) {
+            return ensureHostBusinessFactory("nativeArtboardExport", "modules/stitch/native-artboard-export.jsx")()
+                .exportJpeg(document, folder, quality, singleSquare);
+        },
         MAX_CANVAS_HEIGHT: MAX_CANVAS_HEIGHT, INITIAL_CANVAS_HEIGHT: INITIAL_CANVAS_HEIGHT
     });
         }
@@ -1269,6 +1295,14 @@ var LongStitchCEP = (function () {
         }
         return ocrHostModule;
     }
+    var browserExportModule = null;
+    function getBrowserExportModule() {
+        if (!browserExportModule) browserExportModule = ensureHostBusinessFactory("browserExport", "modules/tools/browser-export.jsx")({
+            selectedLayerIds: selectedLayerIds, currentPixelSelectionBounds: currentPixelSelectionBounds
+        });
+        return browserExportModule;
+    }
+    var toolsExportToBrowser = lazyHostMethod(getBrowserExportModule, "toolsExportToBrowser");
     var exportSelectedLayerForOCR = lazyHostMethod(getOcrHostModule, "exportSelectedLayerForOCR");
     var runTextJob = lazyHostMethod(getOcrHostModule, "runTextJob");
     var createEditableTextLayers = lazyHostMethod(getOcrHostModule, "createEditableTextLayers");
@@ -1280,7 +1314,7 @@ var LongStitchCEP = (function () {
     var frameModule = null;
     function getFrameModule() {
         if (!frameModule) {
-            frameModule = ensureHostBusinessFactory("frameTools", "modules/framework/frame.jsx")({
+        frameModule = ensureHostBusinessFactory("frameTools", "modules/framework/frame.jsx")({
         integerValue: integerValue, layerNumericId: layerNumericId, layerSize: layerSize, pixels: pixels,
         selectLayersByIds: selectLayersByIds, selectedLayerIds: selectedLayerIds, suspendToolsHistory: suspendToolsHistory,
         toolCreateShapeRectangle: toolCreateShapeRectangle, toolHexColor: toolHexColor, toolLayerById: toolLayerById,
@@ -1317,8 +1351,18 @@ var LongStitchCEP = (function () {
     var guideToggleOverlays = lazyHostMethod(getGuideModule, "guideToggleOverlays");
     var guideChangeOverlayColor = lazyHostMethod(getGuideModule, "guideChangeOverlayColor");
 
+    var photoshopBridgeModule = null;
+    function toolsBridgeExecute(command) {
+        if (command && command.action === "native_snap_diagnostics") return memorySnapModule.toolsNativeSnapDiagnostics();
+        if (!photoshopBridgeModule) {
+            photoshopBridgeModule = ensureHostBusinessFactory("photoshopBridge", "modules/bridge/commands.jsx")();
+        }
+        return photoshopBridgeModule.toolsBridgeExecute(command);
+    }
+
     XinyangHostLoadStage = "method-table-init";
     var methods = {
+        toolsBridgeExecute: toolsBridgeExecute,
         getDiagnosticInfo: getDiagnosticInfo,
         GuideGuide: GuideGuide,
         guideQuickAdd: guideAdd,
@@ -1344,6 +1388,7 @@ var LongStitchCEP = (function () {
         createSmartSlices: createSmartSlices,
         applyLayerSpacing: applyLayerSpacing,
         inspectImageWidth: inspectImageWidth,
+        toolsExportToBrowser: toolsExportToBrowser,
         exportSelectedLayerForOCR: exportSelectedLayerForOCR,
         createEditableTextLayers: createEditableTextLayers,
         selectedTextEraseRegions: selectedTextEraseRegions,
@@ -1364,10 +1409,17 @@ var LongStitchCEP = (function () {
         toolsScaleLayers: toolsScaleLayers,
         toolsAlignLayers: toolsAlignLayers,
         toolsCenterLayersOnCanvas: toolsCenterLayersOnCanvas,
+        toolsAlignLayersToCanvasTop: toolsAlignLayersToCanvasTop,
+        toolsCenterLayersHorizontallyOnCanvas: toolsCenterLayersHorizontallyOnCanvas,
+        toolsCenterLayersVerticallyOnCanvas: toolsCenterLayersVerticallyOnCanvas,
+        toolsCenterLayersVerticallyOnCanvasV2309: toolsCenterLayersVerticallyOnCanvasV2309,
         toolsDistributeLayersEvenly: toolsDistributeLayersEvenly,
         toolsAutoFillForeground: toolsAutoFillForeground,
         toolsSnapShapeAnchors: toolsSnapShapeAnchors,
         toolsApplySmartSnap: toolsApplySmartSnap,
+        toolsConfigureNativeSnap: memorySnapModule.toolsConfigureNativeSnap,
+        toolsNativeSnapDiagnostics: memorySnapModule.toolsNativeSnapDiagnostics,
+        toolsReleaseMemory: memorySnapModule.toolsReleaseMemory,
         toolsSwapShapeFillStroke: toolsSwapShapeFillStroke,
         toolsDistributeLayers: toolsDistributeLayers,
         toolsReplaceElements: toolsReplaceElements,
@@ -1466,7 +1518,7 @@ var LongStitchCEP = (function () {
     }
 
     return {
-        version: "2.2.69",
+        version: "2.3.20",
         invoke: invoke,
         _runActiveJob: runActiveJob,
         _runSliceJob: runSliceJob,

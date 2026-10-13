@@ -134,6 +134,24 @@ XinyangHostModules.frameTools = function (deps) {
             };
         }
 
+        function frameWorkArea(document) {
+            var canvas = frameCanvasBounds(document);
+            var bounds;
+            try {
+                bounds = document.selection.bounds;
+            } catch (ignoreFrameSelection) {
+                throw new Error("请先在画布中创建选区，再生成自定义框架");
+            }
+            var left = Math.max(canvas.left, Math.floor(pixels(bounds[0])));
+            var top = Math.max(canvas.top, Math.floor(pixels(bounds[1])));
+            var right = Math.min(canvas.right, Math.ceil(pixels(bounds[2])));
+            var bottom = Math.min(canvas.bottom, Math.ceil(pixels(bounds[3])));
+            if (right - left <= 1 || bottom - top <= 1) {
+                throw new Error("当前选区范围无效，请重新建立选区");
+            }
+            return { left: left, top: top, right: right, bottom: bottom };
+        }
+
         function frameCreateShapeEllipse(document, bounds, colorValue) {
             var color = toolHexColor(colorValue);
             try {
@@ -233,11 +251,11 @@ XinyangHostModules.frameTools = function (deps) {
 
             var rowSpace = Math.max(0, frameUnitPixels(options.rowSpace, 8));
             var colSpace = Math.max(0, frameUnitPixels(options.colSpace, 8));
-            var area = frameCanvasBounds(document);
+            var area = frameWorkArea(document);
             var areaWidth = area.right - area.left;
             var areaHeight = area.bottom - area.top;
             var usableHeight = areaHeight - rowSpace * Math.max(0, activeLines.length - 1);
-            if (!(usableHeight > 0)) throw new Error("行间距过大，画布没有可用高度");
+            if (!(usableHeight > 0)) throw new Error("行间距过大，选区没有可用高度");
 
             var baseRowHeight = usableHeight / activeLines.length;
             var rowHeights = [];
@@ -251,13 +269,17 @@ XinyangHostModules.frameTools = function (deps) {
                 totalHeight += explicitHeight;
             }
             if (totalHeight > areaHeight + 0.5) {
-                throw new Error("各行高度与间距合计超出画布高度 " + Math.round(areaHeight) + "px");
+                throw new Error("各行高度与间距合计超出选区高度 " + Math.round(areaHeight) + "px");
             }
 
             var defaultMainPixels = Math.max(16, Math.min(36, baseRowHeight * 0.11));
             var defaultSubPixels = Math.max(10, Math.min(22, defaultMainPixels * 0.58));
-            var mainPt = frameFontPoints(options.t1, defaultMainPixels, document);
-            var subPt = frameFontPoints(options.t2, defaultSubPixels, document);
+            var mainText = frameTrim(options.t1);
+            var subText = frameTrim(options.t2);
+            var hasMainText = !!mainText;
+            var hasSubText = !!subText;
+            var mainPt = hasMainText ? frameFontPoints(mainText, defaultMainPixels, document) : 0;
+            var subPt = hasSubText ? frameFontPoints(subText, defaultSubPixels, document) : 0;
             var pxPerPt = Math.max(0.1, Number(document.resolution) || 72) / 72;
             var mainPx = mainPt * pxPerPt;
             var subPx = subPt * pxPerPt;
@@ -298,8 +320,9 @@ XinyangHostModules.frameTools = function (deps) {
                                 right: currentLeft + cellWidth,
                                 bottom: rowBottom
                             };
-                            var externalReserve = textLayout.external
-                                ? Math.min(rowHeight * 0.42, Math.max(18, mainPx + subPx + 8))
+                            var textReserve = (hasMainText ? mainPx : 0) + (hasSubText ? subPx : 0) + (hasMainText && hasSubText ? 8 : (hasMainText || hasSubText ? 4 : 0));
+                            var externalReserve = textLayout.external && textReserve > 0
+                                ? Math.min(rowHeight * 0.42, Math.max(12, textReserve))
                                 : 0;
                             var shapeArea = {
                                 left: cell.left,
@@ -357,9 +380,10 @@ XinyangHostModules.frameTools = function (deps) {
                                 titleVertical = "bottom";
                             }
 
-                            var titleHeight = Math.max(8, mainPx + 2);
-                            var subtitleHeight = Math.max(7, subPx + 2);
-                            var contentHeight = titleHeight + subtitleHeight + 2;
+                            var titleHeight = hasMainText ? Math.max(8, mainPx + 2) : 0;
+                            var subtitleHeight = hasSubText ? Math.max(7, subPx + 2) : 0;
+                            var contentGap = hasMainText && hasSubText ? 2 : 0;
+                            var contentHeight = titleHeight + subtitleHeight + contentGap;
                             var blockTop = titleVertical === "middle"
                                 ? titleRegion.top + Math.max(0, (titleRegion.bottom - titleRegion.top - contentHeight) / 2)
                                 : Math.max(titleRegion.top, titleRegion.bottom - contentHeight);
@@ -371,12 +395,16 @@ XinyangHostModules.frameTools = function (deps) {
                             };
                             var subBox = {
                                 left: titleRegion.left,
-                                top: mainBox.bottom + 2,
+                                top: mainBox.bottom + contentGap,
                                 right: titleRegion.right,
-                                bottom: Math.min(titleRegion.bottom, mainBox.bottom + 2 + subtitleHeight)
+                                bottom: Math.min(titleRegion.bottom, mainBox.bottom + contentGap + subtitleHeight)
                             };
-                            frameCreateText(document, rowGroup, "主标题", "主标题", mainPt, textColor, mainBox, textLayout.horizontal, "middle");
-                            frameCreateText(document, rowGroup, "副标题", "副标题", subPt, textColor, subBox, textLayout.horizontal, "middle");
+                            if (hasMainText) {
+                                frameCreateText(document, rowGroup, "主标题", "主标题", mainPt, textColor, mainBox, textLayout.horizontal, "middle");
+                            }
+                            if (hasSubText) {
+                                frameCreateText(document, rowGroup, "副标题", "副标题", subPt, textColor, subBox, textLayout.horizontal, "middle");
+                            }
 
                             currentLeft = cell.right + colSpace;
                         }

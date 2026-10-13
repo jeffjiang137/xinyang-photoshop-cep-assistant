@@ -29,21 +29,29 @@ var XinyangTextButtonV2250 = $.global.XinyangTextButtonV2250 = (function () {
         return null;
     }
     function selectedTextLayers(document) {
-        var indexes = [], output = [], reference, descriptor, list, index, item, query, id, layer;
+        var ids = [], output = [], property, reference, descriptor, list, index, layer;
         try {
+            /*
+             * targetLayers 返回的是图层栈索引。索引会受背景层、组边界和
+             * 嵌套层级影响，同组相邻文字层可能因此解析成另一个图层。
+             * 直接读取稳定的 layer ID，确保按钮始终对应用户实际选中的文字。
+             */
+            property = stringIDToTypeID("targetLayersIDs");
             reference = new ActionReference();
-            reference.putProperty(charIDToTypeID("Prpr"), stringIDToTypeID("targetLayers"));
-            reference.putEnumerated(charIDToTypeID("Dcmn"), charIDToTypeID("Ordn"), charIDToTypeID("Trgt"));
-            descriptor = executeActionGet(reference); list = descriptor.getList(stringIDToTypeID("targetLayers"));
-            for (index = 0; index < list.count; index += 1) { item = list.getReference(index); indexes.push(item.getIndex()); }
+            reference.putProperty(stringIDToTypeID("property"), property);
+            reference.putEnumerated(stringIDToTypeID("document"), stringIDToTypeID("ordinal"), stringIDToTypeID("targetEnum"));
+            descriptor = executeActionGet(reference);
+            if (descriptor.hasKey(property)) {
+                list = descriptor.getList(property);
+                for (index = 0; index < list.count; index += 1) {
+                    ids.push(list.getReference(index).getIdentifier(charIDToTypeID("Lyr ")));
+                }
+            }
         } catch (ignoreMulti) {}
-        if (!indexes.length) return [document.activeLayer];
-        for (index = 0; index < indexes.length; index += 1) {
-            try {
-                query = new ActionReference(); query.putIndex(charIDToTypeID("Lyr "), indexes[index]);
-                id = executeActionGet(query).getInteger(stringIDToTypeID("layerID"));
-                layer = findLayer(document, id); if (layer) output.push(layer);
-            } catch (ignoreLayer) {}
+        if (!ids.length) return [document.activeLayer];
+        for (index = 0; index < ids.length; index += 1) {
+            layer = findLayer(document, ids[index]);
+            if (layer) output.push(layer);
         }
         return output.length ? output : [document.activeLayer];
     }

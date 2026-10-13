@@ -25,6 +25,7 @@
     iopaintIdleMinutes: "longStitch.iopaintIdleMinutes"
   };
   var VALID_PANELS = {
+    "bridge-panel": true,
     "stitch-panel": true,
     "framework-panel": true,
     "spacing-panel": true,
@@ -694,6 +695,8 @@
                 ? "设置字体、字号、字距、行距与文字排版"
                 : panelId === "tools-panel"
                   ? "使用常用功能与图层工具"
+                  : panelId === "bridge-panel"
+                    ? "连接本机 AI 工具与 Photoshop，管理桥接和运行状态"
                   : panelId === "settings-panel"
               ? "可设置插件是否在切换 Photoshop 面板后保留当前会话"
               : panelId === "text-panel"
@@ -755,6 +758,12 @@
         state.sliceExportBusy || state.sliceBusy || state.stitchBusy ||
         state.spacingBusy || state.ocrBusy || state.eraseBusy;
     }
+    ["#clear-document-guides", "#clear-document-slices"].forEach(function (selector) {
+      var clearButton = $(selector);
+      if (clearButton) clearButton.disabled =
+        state.sliceExportBusy || state.sliceBusy || state.stitchBusy ||
+        state.spacingBusy || state.ocrBusy || state.eraseBusy;
+    });
   }
 
   function updateWidthButtonsDisabled() {
@@ -1489,6 +1498,7 @@
         width: line.box.width,
         height: line.box.height,
         fontHeight: line.fontHeight || line.box.height,
+        textDirection: line.textDirection || "horizontal",
         color: line.color,
         fontFamily: line.fontFamily || "",
         fontStyle: line.fontStyle,
@@ -1884,6 +1894,32 @@
         return;
       }
       setStatus("导出切片失败：" + humanError(error));
+    }).then(function () {
+      setSliceExportBusy(false);
+    });
+  }
+
+  function clearCurrentDocumentGuides() {
+    if (state.sliceExportBusy || state.sliceBusy || state.stitchBusy || state.spacingBusy || state.ocrBusy || state.eraseBusy) return;
+    setSliceExportBusy(true);
+    setStatus("正在清除当前文档的参考线…");
+    hostInvoke("guide.clear", {}).then(function (result) {
+      setStatus("已清除 " + String(result && result.removed || 0) + " 条参考线");
+    }).catch(function (error) {
+      setStatus("清除参考线失败：" + humanError(error));
+    }).then(function () {
+      setSliceExportBusy(false);
+    });
+  }
+
+  function clearCurrentDocumentSlices() {
+    if (state.sliceExportBusy || state.sliceBusy || state.stitchBusy || state.spacingBusy || state.ocrBusy || state.eraseBusy) return;
+    setSliceExportBusy(true);
+    setStatus("正在清除当前文档的切片…");
+    invokeStandaloneSliceExport("clearSlices", {}).then(function (result) {
+      setStatus("已清除 " + String(result && result.removed || 0) + " 个切片");
+    }).catch(function (error) {
+      setStatus("清除切片失败：" + humanError(error));
     }).then(function () {
       setSliceExportBusy(false);
     });
@@ -2436,6 +2472,8 @@
       "click",
       exportCurrentDocumentSlices
     );
+    $("#clear-document-guides").addEventListener("click", clearCurrentDocumentGuides);
+    $("#clear-document-slices").addEventListener("click", clearCurrentDocumentSlices);
     $("#apply-spacing").addEventListener("click", applyLayerSpacing);
     $("#reset-spacing-values").addEventListener("click", resetSpacingValues);
     $("#recognize-text").addEventListener("click", function () {

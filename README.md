@@ -1,10 +1,10 @@
 # 鑫洋助理 · Xinyang Assistant
 
-[![最新版本](https://img.shields.io/badge/version-2.2.69-2563eb.svg)](CSXS/manifest.xml)
+[![最新版本](https://img.shields.io/badge/version-2.3.20-2563eb.svg)](CSXS/manifest.xml)
 [![Photoshop CEP](https://img.shields.io/badge/Adobe%20Photoshop-CEP%20%2F%20ExtendScript-31a8ff.svg)](https://developer.adobe.com/photoshop/)
 [![GitHub stars](https://img.shields.io/github/stars/jeffjiang137/xinyang-photoshop-cep-assistant?style=flat)](https://github.com/jeffjiang137/xinyang-photoshop-cep-assistant/stargazers)
 
-面向电商设计与高频修图工作的 Photoshop CEP 面板。它把批量拼图、版式生成、文字处理、图层整理和导出等重复操作集中到一个中文工具面板中，适合商品详情页、营销图和长图制作流程。
+鑫洋助理（Xinyang Photoshop CEP Assistant）是一款面向电商视觉设计、商品详情页、营销素材和高频修图工作流的 Adobe Photoshop 扩展。它将长图拼接与智能切片、规则版式、OCR 图片转可编辑文字、AI 擦字服务接入、批量图层管理、文字排版、图片导入导出以及 Photoshop 本机自动化桥接整合到一个中文 CEP 面板中。关键词：Photoshop 插件、CEP 扩展、ExtendScript、电商设计工具、Photoshop 自动化、长图拼接、图片切片、OCR、批量导出、图层整理、PS Bridge。
 
 > This is a Photoshop CEP extension for ecommerce design workflows. The interface is currently Chinese-first, while the source and architecture notes are open for community contribution.
 
@@ -15,8 +15,12 @@
 - **图片转文字**：OCR 识别图片文字，生成格式样式相近的可编辑文字图层；可选 LaMa / IOPaint 擦除原文字。
 - **文字排版**：字体与字重、字符/段落属性、颜色、对齐分布、复制粘贴样式和一键自动排版。
 - **常用工具**：导入图片、智能吸附、图层对齐/分布/变换、自动填充、嵌入图片、文件瘦身和批量导出。
-- **文档与参考线**：常用电商尺寸预设、自定义文档、安全参考线及参考线工具。
+- **浏览器图片发送**：将选区、选中图层或完整画布按原尺寸导出 PNG 并粘贴到当前浏览器焦点，适合与支持图片粘贴的在线工具协作；不会自动提交网页表单。
+- **Photoshop 本机桥接**：可选本机 HTTP 服务、令牌鉴权、任务排队/取消、运行状态和资源保护，让外部兼容客户端通过既有宿主接口执行 Photoshop 操作。桥接默认监听回环地址，不是云端服务。
+- **文档与参考线**：常用电商尺寸预设、自定义文档、安全参考线及 GuideGuide 风格的参考线工具。
 - **按需加载**：浏览器侧和 Photoshop ExtendScript 宿主侧均按功能懒加载，减少首屏脚本解析和不必要的本地服务探测。
+
+完整功能图解与工作流：打开 [项目功能图文说明（HTML）](PROJECT_FEATURES.html)。
 
 ## 安装
 
@@ -48,7 +52,7 @@
 - Photoshop 宿主模块：`jsx/modules/`，由 `jsx/module-loader.jsx` 按需加载。
 - 对外宿主协议保持为 `LongStitchCEP.invoke(method, payloadJson)`。
 
-本项目没有 Node 打包流程；修改后可直接重新加载 CEP 面板。浏览器侧可以运行：
+本项目没有 Node 打包流程；修改后可直接重新加载 CEP 面板。近期版本记录见 [CHANGELOG.md](CHANGELOG.md)，v2.3.20 发布核对与边界见 [V2.3.20_TEST_REPORT.txt](V2.3.20_TEST_REPORT.txt)。浏览器侧可运行：
 
 ```powershell
 node --check js/runtime.js
@@ -57,7 +61,7 @@ node --check js/panel.js
 
 修改 `jsx/host.jsx` 或其他宿主脚本后，需要重启 Photoshop，并使用一个可丢弃的 PSD 手工验证撤销行为、已有组、智能对象、锁定图层和剪切蒙版。
 
-架构约束和模块加载顺序见 [ARCHITECTURE.md](ARCHITECTURE.md)，版本测试记录见 [V2.2.69_TEST_REPORT.txt](V2.2.69_TEST_REPORT.txt)。
+架构约束和模块加载顺序见 [ARCHITECTURE.md](ARCHITECTURE.md)，版本更新记录见 [CHANGELOG.md](CHANGELOG.md)。历史测试报告已归档到项目工作资料目录。
 
 ## 参与贡献
 

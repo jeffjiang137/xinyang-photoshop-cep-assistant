@@ -322,6 +322,15 @@
       return glyphWidthWeight(String(character || ""));
     }
 
+    // 几何分段不得从英文单词、缩写或连字符单词内部切开。
+    // 窄字母/大小写的自然高度差不构成独立样式的可靠证据。
+    function insideOcrLatinWord(characters, index) {
+      var left = characters.slice(0, index).join("");
+      var right = characters.slice(index).join("");
+      return /[A-Za-z0-9]['’\-]?$/.test(left) &&
+        /^['’\-]?[A-Za-z0-9]/.test(right);
+    }
+
     function ocrTextWeightRange(characters, start, end) {
       var total = 0;
       var index;
@@ -377,6 +386,7 @@
           var maximumStart = j - 1;
           for (k = minimumStart; k <= maximumStart; k += 1) {
             if (!isFinite(dp[i - 1][k])) continue;
+            if (k > 0 && insideOcrLatinWord(characters, k)) continue;
             var partWeight = ocrTextWeightRange(characters, k, j);
             var expectedRatio = capacities[i - 1] / capacityTotal;
             var actualRatio = partWeight / textTotal;
@@ -795,7 +805,29 @@
       var normalGap = ocrMedian(allGaps, 0);
       var gapMad = ocrMad(allGaps, normalGap);
       var candidates = [];
+      // 数字+单位也可能完全同字号，不能仅凭文本规则把单位缩成一半。
+      // 用实际字符像素高度确认；允许末尾单字单位突破普通单字防拆规则。
+      var unitMatch = characters.join("").match(/^(\d[\d,.:]*)(小时|分钟|名|人|位|台|套|项|款|种|家|件|个|年|月|天|秒|㎡|m²|cm|mm|kg|g|吨|%|％|\+)$/i);
+      if (unitMatch) {
+        var unitStart = ocrTextCharacters(unitMatch[1]).length;
+        var digitMetrics = metrics.slice(0, unitStart).filter(function (metric) {
+          return /[0-9]/.test(metric.character) && metric.pixelCount >= 6;
+        });
+        var unitMetrics = metrics.slice(unitStart);
+        var digitHeight = ocrMedian(digitMetrics.map(function (metric) {
+          return metric.fontHeight;
+        }), 0);
+        var unitHeight = ocrMedian(unitMetrics.map(function (metric) {
+          return metric.fontHeight;
+        }), 0);
+        if (digitMetrics.length && unitMetrics.length && digitHeight >= 12 &&
+            unitHeight >= digitHeight * 0.30 && unitHeight <= digitHeight * 0.78 &&
+            unitMetrics.every(function (metric) { return metric.pixelCount >= 6; })) {
+          candidates.push({ index: unitStart, sizeBreak: true, strongIsolation: true });
+        }
+      }
       for (index = 0; index < metrics.length - 1; index += 1) {
+        if (insideOcrLatinWord(characters, index + 1)) continue;
         var leftWindow = ocrMetricWindow(metrics, Math.max(0, index - 1), index + 1);
         var rightWindow = ocrMetricWindow(metrics, index + 1, Math.min(metrics.length, index + 3));
         var referenceHeight = Math.max(
@@ -904,11 +936,11 @@
         background, contrastThreshold);
         var runText = characters.slice(startIndex, endIndex).join("");
         output.push({
-          x: runLeft,
+          x: runMetric.x,
           y: isFinite(Number(runMetric.y))
             ? Number(runMetric.y)
             : Number(segment.y) || 0,
-          width: Math.max(1, runRight - runLeft),
+          width: Math.max(1, runMetric.width),
           height: Math.max(
             1,
             Number(runMetric.height) || Number(segment.height) || 1
@@ -1139,6 +1171,8 @@
 
     function explicitOcrFontStyle(line) {
       var token = String(line && line.fontFamily || "").toLowerCase();
+      // sans-serif 包含 serif，必须先判定无衬线。
+      if (/sans/.test(token)) return "sans";
       if (/serif|song|simsun|宋|明朝|mincho|source.?han.?serif|noto.?serif/.test(token)) {
         return "serif";
       }
@@ -1188,9 +1222,10 @@
       var mask = [];
       var data = imageData.data;
       var foregroundContrast = colorDistance(foreground, background);
-      var minimumContrast = Math.max(Number(contrastThreshold) || 38,
-        foregroundContrast * 0.56);
+      if (foregroundContrast < Math.max(24, Number(contrastThreshold) || 38)) return null;
       var maximumColorDrift = Math.max(30, Math.min(82, foregroundContrast * 0.42));
+      var axis = [foreground[0] - background[0], foreground[1] - background[1], foreground[2] - background[2]];
+      var axisSquared = Math.max(1, foregroundContrast * foregroundContrast);
       var activeCount = 0;
       var row;
       var col;
@@ -1201,9 +1236,13 @@
           var x = Math.min(right - 1, left + col * stride);
           var offset = (y * canvasWidth + x) * 4;
           var rgb = [data[offset], data[offset + 1], data[offset + 2]];
-          var active = data[offset + 3] >= 32 &&
-            colorDistance(rgb, background) >= minimumContrast &&
-            colorDistance(rgb, foreground) <= maximumColorDrift;
+          // 沿前景/背景混色轴估计覆盖率，保留抗锯齿后的细横笔。
+          var coverage = ((rgb[0] - background[0]) * axis[0] +
+            (rgb[1] - background[1]) * axis[1] + (rgb[2] - background[2]) * axis[2]) / axisSquared;
+          var predicted = [background[0] + axis[0] * coverage,
+            background[1] + axis[1] * coverage, background[2] + axis[2] * coverage];
+          var active = data[offset + 3] >= 32 && coverage >= 0.40 &&
+            coverage <= 1.3 && colorDistance(rgb, predicted) <= Math.min(32, maximumColorDrift);
           mask[row][col] = active;
           if (active) activeCount += 1;
         }
@@ -1213,12 +1252,41 @@
       var maximumThickness = Math.max(2, Math.round(Math.min(rows, cols) * 0.30));
       var verticalStrokeWidths = [];
       var horizontalStrokeHeights = [];
+      function stableRun(major, start, end, horizontal) {
+        var minorLimit = horizontal ? cols : rows;
+        var majorLimit = horizontal ? rows : cols;
+        // 边界截断的笔画不参与粗细判断。
+        if (start <= 0 || end >= minorLimit) return false;
+        var center = Math.floor((start + end - 1) / 2);
+        var tolerance = Math.max(0.75, (end - start) * 0.20);
+        var support = 0;
+        var farSupport = 0;
+        [-2, -1, 1, 2].forEach(function (delta) {
+          var neighbor = major + delta;
+          if (neighbor < 0 || neighbor >= majorLimit) return;
+          function activeAt(minor) {
+            return horizontal ? mask[neighbor][minor] : mask[minor][neighbor];
+          }
+          if (!activeAt(center)) return;
+          var a = center;
+          var b = center + 1;
+          while (a > 0 && activeAt(a - 1)) a -= 1;
+          while (b < minorLimit && activeAt(b)) b += 1;
+          if (Math.abs(a - start) <= tolerance && Math.abs(b - end) <= tolerance) {
+            support += 1;
+            if (Math.abs(delta) === 2) farSupport += 1;
+          }
+        });
+        return support >= 2 && farSupport >= 1;
+      }
       for (row = 0; row < rows; row += 1) {
         var run = 0;
         for (col = 0; col <= cols; col += 1) {
           if (col < cols && mask[row][col]) run += 1;
           else if (run) {
-            if (run <= maximumThickness) verticalStrokeWidths.push(run * stride / scale);
+            if (run <= maximumThickness && stableRun(row, col - run, col, true)) {
+              verticalStrokeWidths.push(run * stride / scale);
+            }
             run = 0;
           }
         }
@@ -1228,7 +1296,9 @@
         for (row = 0; row <= rows; row += 1) {
           if (row < rows && mask[row][col]) verticalRun += 1;
           else if (verticalRun) {
-            if (verticalRun <= maximumThickness) horizontalStrokeHeights.push(verticalRun * stride / scale);
+            if (verticalRun <= maximumThickness && stableRun(col, row - verticalRun, row, false)) {
+              horizontalStrokeHeights.push(verticalRun * stride / scale);
+            }
             verticalRun = 0;
           }
         }
@@ -1244,6 +1314,7 @@
         horizontalThickness: horizontalThickness,
         ratio: verticalThickness / Math.max(0.5, horizontalThickness),
         samples: Math.min(verticalStrokeWidths.length, horizontalStrokeHeights.length),
+        sampleStep: stride / scale,
         density: activeCount / Math.max(1, rows * cols)
       };
     }
@@ -1258,7 +1329,10 @@
           slot, line.box, imageData, canvasWidth, canvasHeight, scale,
           background, foreground, contrastThreshold
         );
-        if (metric) measurements.push(metric);
+        if (metric) {
+          metric.character = slot.character;
+          measurements.push(metric);
+        }
       });
       if (!measurements.length) return null;
 
@@ -1266,19 +1340,47 @@
       var verticals = measurements.map(function (metric) { return metric.verticalThickness; });
       var horizontals = measurements.map(function (metric) { return metric.horizontalThickness; });
       var ratio = ocrMedian(ratios, 1);
-      var single = measurements.length === 1;
-      var serifThreshold = single ? 1.31 : 1.23;
-      var sansThreshold = single ? 1.09 : 1.14;
+      // 重复字符只贡献一票，样本的独立性比字符总数更重要。
+      var unique = {};
+      measurements.forEach(function (metric) {
+        if (!unique[metric.character] || unique[metric.character].samples < metric.samples) {
+          unique[metric.character] = metric;
+        }
+      });
+      var votes = { serif: 0, sans: 0, uncertain: 0 };
+      var counts = { serif: 0, sans: 0 };
+      var total = 0;
+      // 截图中的中文字高至少 24 px 时，单像素笔画已能稳定采样；更小字号继续
+      // 使用 1.8 px 门槛，避免把抗锯齿误差当成宋体/黑体笔画差异。
+      var minimumReliableStrokePixels = Number(line.box.height) * (Number(scale) || 1) >= 24
+        ? 1 : 1.8;
+      Object.keys(unique).forEach(function (character) {
+        var metric = unique[character];
+        var step = metric.sampleStep || 1 / scale;
+        var minimum = Math.min(metric.horizontalThickness, metric.verticalThickness) / step;
+        var maximum = Math.max(metric.horizontalThickness, metric.verticalThickness) / step;
+        if (metric.samples < 8 || minimum < minimumReliableStrokePixels ||
+            maximum < minimumReliableStrokePixels) return;
+        var weight = Math.min(40, metric.samples);
+        var category = metric.ratio >= 1.5 ? "serif"
+          : metric.ratio >= 0.82 && metric.ratio <= 1.30 ? "sans" : "uncertain";
+        votes[category] += weight;
+        total += weight;
+        if (category !== "uncertain") counts[category] += 1;
+      });
+      var winner = votes.serif > votes.sans ? "serif" : "sans";
+      var agreement = total ? votes[winner] / total : 0;
       var style = "";
       var confidence = 0;
-      if (ratio >= serifThreshold) {
-        style = "serif";
-        confidence = Math.min(0.98, 0.62 +
-          (ratio - serifThreshold) * 1.45 + measurements.length * 0.045);
-      } else if (ratio <= sansThreshold) {
-        style = "sans";
-        confidence = Math.min(0.98, 0.62 +
-          (sansThreshold - ratio) * 1.6 + measurements.length * 0.045);
+      var independentCount = Object.keys(unique).length;
+      var singleStrong = counts[winner] === 1 && total >= 20 &&
+        (winner === "serif" ? ratio >= 1.8
+          : ratio >= 0.9 && ratio <= 1.3 && ocrMedian(horizontals, 0) * scale >= 1.8);
+      // 不能因细横笔未达到分辨率门槛，就只用剩余粗笔字符把宋体判为黑体。
+      var wholeLineAgrees = winner === "serif" ? ratio >= 1.35 : ratio <= 1.35;
+      if (wholeLineAgrees && agreement >= 0.72 && (counts[winner] >= 2 || singleStrong)) {
+        style = winner;
+        confidence = Math.min(0.96, 0.62 + agreement * 0.16 + Math.min(4, counts[winner]) * 0.035);
       }
       return {
         style: style,
@@ -1286,12 +1388,46 @@
         ratio: ratio,
         verticalThickness: ocrMedian(verticals, 1),
         horizontalThickness: ocrMedian(horizontals, 1),
-        characterSamples: measurements.length
+        characterSamples: measurements.length,
+        independentCharacters: independentCount,
+        agreement: agreement
       };
+    }
+
+    function resolveOcrTextDirection(line) {
+      if (!line || !line.box) return line;
+      var text = String(line.text || "").trim();
+      var characters = ocrTextCharacters(text.replace(/\s/g, ""));
+      var count = characters.length;
+      var declared = String(line.textDirection || "").toLowerCase();
+      var vertical = /^(vertical|vertical-rl|vertical-lr|ttb)$/.test(declared);
+      var width = Math.max(1, Number(line.box.width) || 1);
+      var height = Math.max(1, Number(line.box.height) || 1);
+      var cjk = characters.filter(function (character) {
+        return /[\u3400-\u9fff\uf900-\ufaff]/.test(character);
+      }).length;
+      var multiline = /[\r\n]/.test(text) && text.split(/[\r\n]+/).some(function (part) {
+        return ocrTextCharacters(part.trim()).length > 1;
+      });
+      // 仅推断接近一个字宽的直立中文列；旋转横排、段落和纯英文保持原方向。
+      if (!declared && count >= 2 && cjk / count >= 0.7 && !multiline &&
+          Math.abs(Number(line.angle) || 0) < 10 && height / width >= 1.65 &&
+          height / count / width >= 0.65 && height / count / width <= 1.65) {
+        vertical = true;
+      }
+      if (vertical && count) {
+        line.textDirection = "vertical";
+        line.text = text.replace(/[\r\n]+/g, "");
+        line.fontHeight = Math.max(1, Math.min(width, height / count));
+        line.fontSize = 0;
+        line.visualTextSegments = null;
+      }
+      return line;
     }
 
     function analyzeOcrLineAppearance(line, imageData, canvasWidth, canvasHeight,
         scale) {
+      resolveOcrTextDirection(line);
       var box = line && line.box ? line.box : null;
       if (!box) return line;
       var left = Math.max(0, Math.floor(box.x * scale));
@@ -1394,7 +1530,7 @@
       if (!line.color) line.color = "#111111";
 
       var explicitStyle = explicitOcrFontStyle(line);
-      var inferredStyle = inferOcrFontStyleFromPixels(
+      var inferredStyle = line.textDirection === "vertical" ? null : inferOcrFontStyleFromPixels(
         line,
         imageData,
         canvasWidth,
@@ -1493,6 +1629,10 @@
           line.fontSize = 0;
           line.boxSource = "image";
         }
+        if (line.textDirection === "vertical") {
+          resolveOcrTextDirection(line);
+          return line;
+        }
         tightenOcrBoxToTextCluster(
           line,
           columnCounts,
@@ -1530,6 +1670,7 @@
 
         function applyFallback() {
           items.forEach(function (line) {
+            resolveOcrTextDirection(line);
             if (!line.color) line.color = "#111111";
           });
         }
@@ -1670,6 +1811,8 @@
           sourceLineId: "ocr-line-" + lines.length,
           text: text,
           box: box,
+          textDirection: String(item.textDirection || item.direction || item.orientation ||
+            style.textDirection || style.direction || style.orientation || ""),
           score: Math.max(0, Math.min(1, Number(
             recognition ? recognition[1] :
             item.score != null ? item.score :
@@ -1682,11 +1825,11 @@
             item.font_family || item.fontFamily ||
             style.font_family || style.fontFamily || ""
           ).trim(),
-          fontStyle: /serif|song|simsun|宋|明朝|mincho|source.?han.?serif|noto.?serif/i.test(String(
+          fontStyle: explicitOcrFontStyle({ fontFamily: String(
             item.font_style || item.fontStyle || item.font_family || item.fontFamily ||
             style.font_style || style.fontStyle || style.font_family ||
             style.fontFamily || "sans"
-          )) ? "serif" : "sans",
+          ) }) || "sans",
           weight: /black|heavy|extra.?bold|ultra.?bold|[89]00/i.test(String(
             item.weight || item.font_weight ||
             style.weight || style.fontWeight || ""
@@ -1710,6 +1853,7 @@
         });
       });
 
+      lines.forEach(resolveOcrTextDirection);
       if (!lines.length) throw new Error("未识别到带坐标的文字");
       return {
         lines: lines,
@@ -1761,6 +1905,7 @@
           ? line.fontHeight * (fontScale || 1)
           : 0,
         angle: line.angle,
+        textDirection: line.textDirection || "",
         serviceGroup: line.serviceGroup,
         tableLayout: !!line.tableLayout,
         tableRow: isFinite(Number(line.tableRow)) ? Number(line.tableRow) : null,
@@ -1808,6 +1953,9 @@
     }
 
     function sameOcrVisualRow(row, line) {
+      if (line.textDirection === "vertical" || (row.items || []).some(function (item) {
+        return item.textDirection === "vertical";
+      })) return false;
       var box = line.box;
       var lineCenter = box.y + box.height / 2;
       var lineBaseline = box.y + box.height;
@@ -2106,7 +2254,8 @@
       var gap = (Number(right.box.x) || 0) - (
         (Number(left.box.x) || 0) + (Number(left.box.width) || 0)
       );
-      if (/[|丨┃¦/／•·▪]/.test(leftText + rightText)) return false;
+      if (/[|丨┃¦•·▪]/.test(leftText + rightText)) return false;
+      if (!sameSourceLine && /[/／]/.test(leftText + rightText)) return false;
       if (gap < -referenceHeight * 0.2) return false;
       if (gap > Math.max(14, referenceHeight * (sameSourceLine ? 1.95 : 1.75))) {
         return false;
@@ -2199,8 +2348,8 @@
           var nextHeightDifference = Math.abs(
             current.box.height - next.box.height
           ) / Math.max(1, Math.max(current.box.height, next.box.height));
-          if (uniqueColor && previousHeightDifference >= 0.22 &&
-              nextHeightDifference >= 0.22) continue;
+          if (uniqueColor || (previousHeightDifference >= 0.22 &&
+              nextHeightDifference >= 0.22)) continue;
           var previousDistance = ocrLineStyleDistance(current, previous) +
             Math.max(0, previousGap / height) * 0.35;
           var nextDistance = ocrLineStyleDistance(current, next) +
@@ -2523,6 +2672,10 @@
     }
 
     function groupOcrTableCells(lines, knownLayout) {
+      var verticalLines = (lines || []).filter(function (line) {
+        return line.textDirection === "vertical";
+      });
+      lines = (lines || []).filter(function (line) { return line.textDirection !== "vertical"; });
       var layout = knownLayout || detectOcrTableLayout(lines);
       if (!layout) return null;
       var rows = buildOcrVisualRows(lines);
@@ -2530,14 +2683,29 @@
       var output = [];
       var rowsWithTwoCells = 0;
       rows.forEach(function (row, rowIndex) {
-        var cells = [[], []];
+        // 全局分隔线仅是表格证据，不能把它两侧的全部文字当成两个单元格。
+        // 每行允许不同列数（如前两行4列、后面说明行2列）。
+        var cells = [];
+        var previous = null;
+        var hasLeft = false;
+        var hasRight = false;
         row.items.forEach(function (line) {
-          var column = isFinite(Number(line.tableColumn))
-            ? Number(line.tableColumn)
-            : (line.box.x + line.box.width / 2 < layout.boundary ? 0 : 1);
-          cells[column === 0 ? 0 : 1].push(line);
+          var side = line.box.x + line.box.width / 2 < layout.boundary ? 0 : 1;
+          if (side === 0) hasLeft = true;
+          else hasRight = true;
+          var split = !previous;
+          if (previous) {
+            var previousSide = previous.box.x + previous.box.width / 2 < layout.boundary ? 0 : 1;
+            var gap = line.box.x - previous.box.x - previous.box.width;
+            var height = Math.max(1, Math.min(previous.box.height, line.box.height));
+            split = side !== previousSide || gap > Math.max(8, height * 0.8) ||
+              !ocrFragmentStyleCompatible(previous, line);
+          }
+          if (split) cells.push([]);
+          cells[cells.length - 1].push(line);
+          previous = line;
         });
-        if (cells[0].length && cells[1].length) rowsWithTwoCells += 1;
+        if (hasLeft && hasRight) rowsWithTwoCells += 1;
         cells.forEach(function (items, columnIndex) {
           var cell = mergeOcrTableCellItems(
             items,
@@ -2550,9 +2718,9 @@
       });
       var requiredSupport = Math.max(3, Math.ceil(rows.length * 0.6));
       if (rowsWithTwoCells < requiredSupport) return null;
+      output = output.concat(verticalLines);
       return output.sort(function (left, right) {
-        return left.tableRow - right.tableRow ||
-          left.tableColumn - right.tableColumn;
+        return left.box.y - right.box.y || left.box.x - right.box.x;
       });
     }
 
@@ -2653,17 +2821,19 @@
 
 
     function shouldKeepLargeSentenceMerged(line, segments) {
-      if (!line || !line.box || !(segments instanceof Array) || segments.length < 2) {
+      if (!line || !line.box || line.tableCell || line.tableLayout ||
+          !(segments instanceof Array) || segments.length < 2) {
         return false;
       }
       var originalText = String(line.text || "").replace(/\s+/g, "").trim();
-      if (!originalText || /[|丨┃¦/／•·▪!！?？]/.test(originalText)) return false;
+      if (!originalText || /[|丨┃¦•·▪]/.test(originalText)) return false;
       var lineHeight = Math.max(
         1,
-        Number(line.fontHeight) || 0,
-        Number(line.box.height) || 0
+        Number(line.fontHeight) || Number(line.box.height) || 0
       );
-      if (lineHeight < 24 || ocrTextCharacters(originalText).length < 5) return false;
+      // 小字号中英混排也应保留整行；笔画密度变化不能单独证明样式变化。
+      if (ocrTextCharacters(originalText).length < 5) return false;
+      segments = segments.slice().sort(function (left, right) { return left.x - right.x; });
 
       var index;
       for (index = 0; index < segments.length; index += 1) {
@@ -2680,7 +2850,7 @@
           var gap = (Number(current.x) || 0) - (
             (Number(previous.x) || 0) + (Number(previous.width) || 0)
           );
-          if (gap > Math.max(18, lineHeight * 1.55)) return false;
+          if (gap > Math.max(8, lineHeight * 0.8)) return false;
         }
       }
       return true;
@@ -2692,12 +2862,13 @@
      * 的相对宽度顺序分配，生成独立短语层；图标与窄竖线不占文字宽度。
      */
     function splitIconMixedOcrLine(line) {
+      resolveOcrTextDirection(line);
+      if (line && line.textDirection === "vertical") return [line];
       var segments = line && line.visualTextSegments
         ? line.visualTextSegments.slice()
         : [];
       var originalText = String(line && line.text || "")
         .replace(/[|丨┃¦]/g, "")
-        .replace(/\s+/g, "")
         .trim();
       if (segments.length < 2 || segments.length > 24 || !line.box) {
         return [line];
@@ -2712,13 +2883,39 @@
         return left.x - right.x;
       });
       var segmentTexts = segments.map(function (segment) {
-        return String(segment.text || "").replace(/\s+/g, "");
+        return String(segment.text || "").trim();
       });
-      if (segmentTexts.join("") !== originalText) {
+      var compactOriginal = originalText.replace(/\s+/g, "");
+      var consumed = 0;
+      var cutsWord = segmentTexts.some(function (text, index) {
+        consumed += text.replace(/\s+/g, "").length;
+        // 校验分段是否消耗了完整原词，忽略词间空格但不忽略词内切点。
+        var originalIndex = 0;
+        var count = 0;
+        while (originalIndex < originalText.length && count < consumed) {
+          if (!/\s/.test(originalText.charAt(originalIndex))) count += 1;
+          originalIndex += 1;
+        }
+        return index < segmentTexts.length - 1 &&
+          insideOcrLatinWord(ocrTextCharacters(originalText), originalIndex);
+      });
+      if (segmentTexts.join("").replace(/\s+/g, "") !== compactOriginal || cutsWord) {
         var partition = partitionOcrTextBySegments(originalText, segments);
-        if (!partition || partition.join("") !== originalText) return [line];
+        if (!partition || partition.join("").replace(/\s+/g, "") !== compactOriginal) return [line];
         segmentTexts = partition;
       }
+
+      // 分段元数据可能已丢空格。按消耗的原字符范围恢复文本，不能仅验证去空格后相等。
+      var textCursor = 0;
+      segmentTexts = segmentTexts.map(function (text) {
+        var start = textCursor;
+        var remaining = text.replace(/\s+/g, "").length;
+        while (textCursor < originalText.length && remaining > 0) {
+          if (!/\s/.test(originalText.charAt(textCursor))) remaining -= 1;
+          textCursor += 1;
+        }
+        return originalText.slice(start, textCursor).trim();
+      });
 
       var output = [];
       segments.forEach(function (segment, index) {
@@ -2769,6 +2966,7 @@
       var output = lines || [];
       var rows = [];
       output.forEach(function (line) {
+        resolveOcrTextDirection(line);
         var chosen = null;
         rows.forEach(function (row) {
           if (!chosen && sameOcrVisualRow(row, line)) chosen = row;
@@ -2823,11 +3021,11 @@
           });
           remaining = next;
           if (family.length < 2) {
-            seed.fontHeight = seed.box.height;
+            seed.fontHeight = Number(seed.fontHeight) || seed.box.height;
             continue;
           }
           var heights = family.map(function (item) {
-            return Number(item.box.height) || 1;
+            return Number(item.fontHeight) || Number(item.box.height) || 1;
           }).sort(function (left, right) {
             return left - right;
           });
@@ -2843,54 +3041,20 @@
       return output;
     }
 
-    /*
-     * PaddleOCR 经常把“115名”“20台”“99%”识别成一个整行框，
-     * 但原图中的单位实际明显小于数字。这里仅对明确的数字+单位
-     * 组合拆分，避免把普通中文标题误拆成多个图层。
-     */
     function splitMixedSizeLine(line) {
-      if (line && (line.tableCell || line.tableLayout)) return [line];
-      var text = String(line && line.text || "").trim();
-      var match = text.match(
-        /^([¥￥$€£]?[+\-]?\d[\d,.:\-\/]*)(\s*(?:小时|分钟|名|人|位|台|套|项|款|种|家|件|个|年|月|天|秒|㎡|m²|cm|mm|kg|g|吨|%|％|\+))$/i
-      );
-      if (!match || !line.box) return [line];
-
-      var primaryText = String(match[1] || "").trim();
-      var unitText = String(match[2] || "").trim();
-      if (!primaryText || !unitText) return [line];
-
-      var box = line.box;
-      var primaryHeight = Math.max(1, box.height);
-      var unitScale = /^[%％+]$/.test(unitText) ? 0.56 : 0.48;
-      var unitHeight = Math.max(1, primaryHeight * unitScale);
-      var gap = Math.max(0, primaryHeight * 0.045);
-      var primaryNatural = glyphWidthWeight(primaryText) * primaryHeight;
-      var unitNatural = glyphWidthWeight(unitText) * unitHeight;
-      var availableWidth = Math.max(2, box.width - gap);
-      var naturalTotal = Math.max(1, primaryNatural + unitNatural);
-      var primaryWidth = availableWidth * primaryNatural / naturalTotal;
-      var unitWidth = Math.max(1, availableWidth - primaryWidth);
-
-      return [
-        copyOcrLine(line, primaryText, {
-          x: box.x,
-          y: box.y,
-          width: Math.max(1, primaryWidth),
-          height: primaryHeight
-        }, "primary", 1),
-        copyOcrLine(line, unitText, {
-          x: box.x + primaryWidth + gap,
-          y: box.y + primaryHeight - unitHeight,
-          width: unitWidth,
-          height: unitHeight
-        }, "unit", unitScale)
-      ];
+      // 大小字已在像素分析阶段按实测边界拆分。缺少像素证据时保留原行，
+      // 不再从“99%”“20台”等文本猜测单位的字号、位置和宽度。
+      return [line];
     }
 
     function expandTypographyLines(lines) {
       var output = [];
       (lines || []).slice().sort(function (left, right) {
+        if (left.tableCell && right.tableCell &&
+            isFinite(Number(left.tableRow)) && isFinite(Number(right.tableRow))) {
+          return Number(left.tableRow) - Number(right.tableRow) ||
+            Number(left.tableColumn) - Number(right.tableColumn);
+        }
         return left.box.y - right.box.y || left.box.x - right.box.x;
       }).forEach(function (line) {
         splitMixedSizeLine(line).forEach(function (part) {

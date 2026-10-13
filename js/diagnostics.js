@@ -3,7 +3,7 @@
 
   if (window.XinyangDiagnostics) return;
 
-  var VERSION = "2.2.69";
+  var VERSION = "2.3.20";
   var STORAGE_KEY = "xinyang.diagnostics.recent.v1";
   var MAX_ENTRIES = 600;
   var PERSIST_ENTRIES = 260;

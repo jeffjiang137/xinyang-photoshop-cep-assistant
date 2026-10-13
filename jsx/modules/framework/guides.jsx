@@ -46,20 +46,58 @@ XinyangHostModules.guides = function (deps) {
         function guideBoundsFromLayers(document, ids) {
             var left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
             var found = 0;
-            var index;
-            for (index = 0; index < ids.length; index += 1) {
-                var layer = findLayerById(document, ids[index]);
-                if (!layer) continue;
+            var wanted = {}, index;
+
+            /*
+             * 快捷参考线最常见的是单选图层。直接读取 activeLayer 的 bounds
+             * 可避免对大型 PSD 的整棵图层树进行扫描。
+             */
+            if (ids.length === 1) {
                 try {
-                    var size = layerSize(layer);
-                    if (!(size.width > 0 && size.height > 0)) continue;
-                    left = Math.min(left, size.left);
-                    top = Math.min(top, size.top);
-                    right = Math.max(right, size.left + size.width);
-                    bottom = Math.max(bottom, size.top + size.height);
-                    found += 1;
-                } catch (ignoreLayerBounds) {}
+                    var activeLayer = document.activeLayer;
+                    var activeSize = layerSize(activeLayer);
+                    if (activeSize.width > 0 && activeSize.height > 0) {
+                        return {
+                            left: activeSize.left,
+                            top: activeSize.top,
+                            right: activeSize.left + activeSize.width,
+                            bottom: activeSize.top + activeSize.height,
+                            width: activeSize.width,
+                            height: activeSize.height,
+                            source: "layer"
+                        };
+                    }
+                } catch (ignoreActiveGuideLayerBounds) {}
             }
+            for (index = 0; index < ids.length; index += 1) wanted["i" + ids[index]] = true;
+
+            /*
+             * 快捷边界参考线此前会为每个选中图层递归查找一次。对于深层
+             * 分组和多选图层，这会重复扫描整棵图层树。现在只遍历一次。
+             */
+            function walk(container) {
+                var itemIndex;
+                if (!container || !container.layers) return;
+                for (itemIndex = 0; itemIndex < container.layers.length; itemIndex += 1) {
+                    var layer = container.layers[itemIndex];
+                    var id = 0;
+                    try { id = layerNumericId(layer); } catch (ignoreGuideLayerId) {}
+                    if (wanted["i" + id]) {
+                        try {
+                            var size = layerSize(layer);
+                            if (size.width > 0 && size.height > 0) {
+                                left = Math.min(left, size.left);
+                                top = Math.min(top, size.top);
+                                right = Math.max(right, size.left + size.width);
+                                bottom = Math.max(bottom, size.top + size.height);
+                                found += 1;
+                            }
+                        } catch (ignoreLayerBounds) {}
+                    }
+                    if (layer.typename === "LayerSet") walk(layer);
+                }
+            }
+            walk(document);
             if (!found) return null;
             return {
                 left: left,
@@ -116,7 +154,38 @@ XinyangHostModules.guides = function (deps) {
             };
         }
 
-        function guideHasAt(document, direction, position) {
+        function guidePositionKey(position) {
+            return Math.round(Number(position) * 10);
+        }
+
+        function guidePositionCache(document) {
+            var cache = { vertical: {}, horizontal: {} };
+            var index;
+            for (index = 0; index < document.guides.length; index += 1) {
+                try {
+                    var item = document.guides[index];
+                    var bucket = item.direction === Direction.VERTICAL
+                        ? cache.vertical
+                        : cache.horizontal;
+                    bucket["p" + guidePositionKey(pixels(item.coordinate))] = true;
+                } catch (ignoreGuideCacheRead) {}
+            }
+            return cache;
+        }
+
+        function guideHasAt(document, direction, position, cache) {
+            if (cache) {
+                var cachedBucket = direction === Direction.VERTICAL
+                    ? cache.vertical
+                    : cache.horizontal;
+                var cachedKey = guidePositionKey(position);
+                var offset;
+                /* 保持原先 0.6px 的去重容差，避免网格边界重复。 */
+                for (offset = -6; offset <= 6; offset += 1) {
+                    if (cachedBucket["p" + (cachedKey + offset)]) return true;
+                }
+                return false;
+            }
             var index;
             for (index = 0; index < document.guides.length; index += 1) {
                 var item = document.guides[index];
@@ -130,21 +199,27 @@ XinyangHostModules.guides = function (deps) {
             return false;
         }
 
-        function guideAddAt(document, direction, position, maximum) {
+        function guideAddAt(document, direction, position, maximum, cache) {
             position = Number(position);
             if (!isFinite(position)) return 0;
             position = guideClamp(position, 0, maximum);
-            if (guideHasAt(document, direction, position)) return 0;
+            if (guideHasAt(document, direction, position, cache)) return 0;
             document.guides.add(direction, UnitValue(position, "px"));
+            if (cache) {
+                var bucket = direction === Direction.VERTICAL
+                    ? cache.vertical
+                    : cache.horizontal;
+                bucket["p" + guidePositionKey(position)] = true;
+            }
             return 1;
         }
 
-        function guideAddVertical(document, position) {
-            return guideAddAt(document, Direction.VERTICAL, position, pixels(document.width));
+        function guideAddVertical(document, position, cache) {
+            return guideAddAt(document, Direction.VERTICAL, position, pixels(document.width), cache);
         }
 
-        function guideAddHorizontal(document, position) {
-            return guideAddAt(document, Direction.HORIZONTAL, position, pixels(document.height));
+        function guideAddHorizontal(document, position, cache) {
+            return guideAddAt(document, Direction.HORIZONTAL, position, pixels(document.height), cache);
         }
 
         function guidePositiveCount(value) {
@@ -152,7 +227,7 @@ XinyangHostModules.guides = function (deps) {
             return number > 0 ? Math.min(number, 200) : 0;
         }
 
-        function guideCreateAxisGrid(document, start, end, count, itemSize, gap, vertical) {
+        function guideCreateAxisGrid(document, start, end, count, itemSize, gap, vertical, cache) {
             var added = 0;
             var available = Math.max(0, end - start);
             if (!(available > 0) || !(count > 0)) return 0;
@@ -167,12 +242,12 @@ XinyangHostModules.guides = function (deps) {
             var index;
             for (index = 0; index < count; index += 1) {
                 added += vertical
-                    ? guideAddVertical(document, cursor)
-                    : guideAddHorizontal(document, cursor);
+                    ? guideAddVertical(document, cursor, cache)
+                    : guideAddHorizontal(document, cursor, cache);
                 cursor += itemSize;
                 added += vertical
-                    ? guideAddVertical(document, cursor)
-                    : guideAddHorizontal(document, cursor);
+                    ? guideAddVertical(document, cursor, cache)
+                    : guideAddHorizontal(document, cursor, cache);
                 cursor += gap;
             }
             return added;
@@ -182,6 +257,8 @@ XinyangHostModules.guides = function (deps) {
             if (!app.documents.length) throw new Error("请先打开 Photoshop 文档");
             options = options || {};
             var document = app.activeDocument;
+            /* 批量创建只读取一次现有参考线，后续查重在内存中完成。 */
+            var positionCache = guidePositionCache(document);
             var bounds = guideResolveBounds(document, options.isLayer !== false, false);
             var resolution = Number(document.resolution) || 72;
             var width = Math.max(1, bounds.width);
@@ -198,10 +275,10 @@ XinyangHostModules.guides = function (deps) {
                 throw new Error("边距超过当前范围，请检查输入值");
             }
             var added = 0;
-            if (leftPadding !== null) added += guideAddVertical(document, innerLeft);
-            if (rightPadding !== null) added += guideAddVertical(document, innerRight);
-            if (topPadding !== null) added += guideAddHorizontal(document, innerTop);
-            if (bottomPadding !== null) added += guideAddHorizontal(document, innerBottom);
+            if (leftPadding !== null) added += guideAddVertical(document, innerLeft, positionCache);
+            if (rightPadding !== null) added += guideAddVertical(document, innerRight, positionCache);
+            if (topPadding !== null) added += guideAddHorizontal(document, innerTop, positionCache);
+            if (bottomPadding !== null) added += guideAddHorizontal(document, innerBottom, positionCache);
 
             var columns = guidePositiveCount(options.column);
             var rows = guidePositiveCount(options.row);
@@ -219,29 +296,29 @@ XinyangHostModules.guides = function (deps) {
             }
             if (columns) added += guideCreateAxisGrid(
                 document, innerLeft, innerRight, columns,
-                columnWidth, columnSpace, true
+                columnWidth, columnSpace, true, positionCache
             );
             if (rows) added += guideCreateAxisGrid(
                 document, innerTop, innerBottom, rows,
-                rowHeight, rowSpace, false
+                rowHeight, rowSpace, false, positionCache
             );
 
             var colCenter = guideUnitPixels(options.colCenter, width, resolution);
             var rowCenter = guideUnitPixels(options.rowCenter, height, resolution);
             if (colCenter !== null) {
                 if (Math.abs(colCenter) < 0.01) {
-                    added += guideAddVertical(document, bounds.left + width / 2);
+                    added += guideAddVertical(document, bounds.left + width / 2, positionCache);
                 } else {
-                    added += guideAddVertical(document, bounds.left + width / 2 - Math.abs(colCenter) / 2);
-                    added += guideAddVertical(document, bounds.left + width / 2 + Math.abs(colCenter) / 2);
+                    added += guideAddVertical(document, bounds.left + width / 2 - Math.abs(colCenter) / 2, positionCache);
+                    added += guideAddVertical(document, bounds.left + width / 2 + Math.abs(colCenter) / 2, positionCache);
                 }
             }
             if (rowCenter !== null) {
                 if (Math.abs(rowCenter) < 0.01) {
-                    added += guideAddHorizontal(document, bounds.top + height / 2);
+                    added += guideAddHorizontal(document, bounds.top + height / 2, positionCache);
                 } else {
-                    added += guideAddHorizontal(document, bounds.top + height / 2 - Math.abs(rowCenter) / 2);
-                    added += guideAddHorizontal(document, bounds.top + height / 2 + Math.abs(rowCenter) / 2);
+                    added += guideAddHorizontal(document, bounds.top + height / 2 - Math.abs(rowCenter) / 2, positionCache);
+                    added += guideAddHorizontal(document, bounds.top + height / 2 + Math.abs(rowCenter) / 2, positionCache);
                 }
             }
             if (!added) throw new Error("没有可创建的参考线，请至少填写一个参数");

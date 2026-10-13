@@ -3,6 +3,7 @@
 
   var cs = new CSInterface();
   var busy = false;
+  var nativeSnapKnown = false;
   var busyControls = null;
   var configSaveTimer = 0;
   var configDirty = false;
@@ -45,6 +46,7 @@
   var AUTO_EMBED_PLACE_EVENT = "1349280544";
   var AUTO_EMBED_PASTE_EVENT = "1885434740";
   var AUTO_FILL_COLOR_EVENT = "1936028772";
+  var AUTO_FILL_SELECT_EVENT = "1936483188";
   var photoshopCallbackInstalled = false;
   var photoshopCallbackName = "";
   var autoEmbedAttemptSerial = 0;
@@ -334,29 +336,24 @@
     attempt(0);
   }
 
-  function findDeepValue(value, key) {
-    if (!value || typeof value !== "object") return undefined;
-    if (value[key] !== undefined) return value[key];
-    var names = Object.keys(value);
-    for (var i = 0; i < names.length; i += 1) {
-      var found = findDeepValue(value[names[i]], key);
-      if (found !== undefined) return found;
-    }
-    return undefined;
-  }
-
   function normalizeColorSetProperty(value) {
     var text = String(value === undefined || value === null ? "" : value);
-    if (/foregroundColor/i.test(text)) return "foregroundColor";
-    if (/backgroundColor/i.test(text)) return "backgroundColor";
+    if (/^foregroundColor$/i.test(text)) return "foregroundColor";
+    if (/^backgroundColor$/i.test(text)) return "backgroundColor";
     return "";
   }
 
   function findColorSetProperty(eventData) {
-    var direct = normalizeColorSetProperty(findDeepValue(eventData, "_property"));
-    if (direct) return direct;
-    direct = normalizeColorSetProperty(findDeepValue(eventData, "property"));
-    if (direct) return direct;
+    // 只检查 set 的目标引用，不能把 to/工具描述符中的颜色当作改色指令。
+    if (!eventData || typeof eventData !== "object") return "";
+    var target = eventData._target || eventData.null || eventData.target;
+    var refs = Array.isArray(target) ? target : [target];
+    for (var i = 0; i < refs.length; i += 1) {
+      var ref = refs[i];
+      if (!ref || typeof ref !== "object") continue;
+      var direct = normalizeColorSetProperty(ref._property || ref.property);
+      if (direct) return direct;
+    }
     return "";
   }
 
@@ -413,6 +410,13 @@
     var eventId = String(rawEventId === undefined ? "" : rawEventId);
     var now = Date.now ? Date.now() : new Date().getTime();
 
+    if (eventId === AUTO_FILL_SELECT_EVENT) {
+      // 框选/切层会同步工具颜色；丢弃旧选择的延迟任务及紧随其后的通知。
+      clearAutoFillQueue();
+      autoFillSuppressUntil = now + AUTO_FILL_SUPPRESS_MS;
+      return;
+    }
+
     if (eventId === AUTO_FILL_COLOR_EVENT && config.autoFillColor) {
       /*
        * setd 是 Photoshop 的通用“设置”事件。旧逻辑把所有 setd 都当作
@@ -422,6 +426,10 @@
        */
       var eventData = payload.eventData || payload;
       var colorSet = findColorSetProperty(eventData);
+      if (!colorSet) {
+        clearAutoFillQueue();
+        return;
+      }
       if (!colorSet || autoFillInFlight || now < autoFillSuppressUntil) return;
       if (lastEventAt.color && now - lastEventAt.color < 80) return;
       lastEventAt.color = now;
@@ -471,10 +479,12 @@
     unregisterPhotoshopEvent(AUTO_EMBED_PLACE_EVENT);
     unregisterPhotoshopEvent(AUTO_EMBED_PASTE_EVENT);
     unregisterPhotoshopEvent(AUTO_FILL_COLOR_EVENT);
+    unregisterPhotoshopEvent(AUTO_FILL_SELECT_EVENT);
     var ok = true;
     if (config.autoEmbedPlace) ok = registerPhotoshopEvent(AUTO_EMBED_PLACE_EVENT) && ok;
     if (config.autoEmbedPaste) ok = registerPhotoshopEvent(AUTO_EMBED_PASTE_EVENT) && ok;
     if (config.autoFillColor) ok = registerPhotoshopEvent(AUTO_FILL_COLOR_EVENT) && ok;
+    if (config.autoFillColor) ok = registerPhotoshopEvent(AUTO_FILL_SELECT_EVENT) && ok;
     if (!ok) {
       var dispatchError = new Error("Photoshop 未接受事件注册请求");
       if (showMessage) status("监听配置失败：" + dispatchError.message);
@@ -682,7 +692,15 @@
 
   function runCanvasCenter(axis) {
     var label = axis === "vertical" ? "基于画布垂直居中" : "基于画布水平居中";
-    runHost("toolsCenterLayersOnCanvas", { axis: axis }, "正在" + label + "…", function (result) {
+    var method = axis === "vertical" ? "toolsCenterLayersVerticallyOnCanvasV2309" : "toolsCenterLayersHorizontallyOnCanvas";
+    runHost(method, {}, "正在" + label + "…", function (result) {
+      return label + "完成：移动 " + result.processed + " 个图层";
+    }).catch(function () {});
+  }
+
+  function runCanvasAlign(position) {
+    var label = position === "top" ? "基于画布顶部对齐" : "基于画布对齐";
+    runHost("toolsAlignLayersToCanvasTop", {}, "正在" + label + "…", function (result) {
       return label + "完成：移动 " + result.processed + " 个图层";
     }).catch(function () {});
   }
@@ -730,47 +748,50 @@
   function updateSmartSnapCard() {
     var button = one('[data-common-action="smart-snap"]');
     var item = button && button.closest ? button.closest(".common-tool-item") : null;
-    if (button) button.setAttribute("aria-pressed", config.smartSnapEnabled ? "true" : "false");
-    if (item) item.classList.toggle("smart-snap-active", !!config.smartSnapEnabled);
+    if (button) button.setAttribute("aria-pressed", nativeSnapKnown ? (config.smartSnapEnabled ? "true" : "false") : "mixed");
+    if (item) item.classList.toggle("smart-snap-active", nativeSnapKnown && !!config.smartSnapEnabled);
   }
 
-  function invokeSmartSnapStandalone(payload) {
-    var root = extensionRootPath().replace(/\\/g, "/").replace(/\/+$/, "");
-    var path = root ? root + "/jsx/smart-snap-v2241.jsx" : "";
-    if (!path) return Promise.reject(new Error("无法定位磁吸模式宿主脚本"));
-    var serialized = "distance=" + Number(payload.distance || 20) + "&layerEdges=" + (payload.layerEdges ? "1" : "0") + "&centers=" + (payload.centers ? "1" : "0") + "&equalSpacing=" + (payload.equalSpacing ? "1" : "0") + "&canvasEdges=" + (payload.canvasEdges ? "1" : "0") + "&guides=" + (payload.guides ? "1" : "0");
-    var script = '(function(){try{$.evalFile(new File(' + JSON.stringify(path) + '));' +
-      'if(typeof XinyangSmartSnapV2241==="undefined"||!XinyangSmartSnapV2241.invoke){throw new Error("磁吸脚本未加载");}' +
-      'return XinyangSmartSnapV2241.invoke(' + JSON.stringify(serialized) + ');}catch(e){return "__SMART_SNAP_HOST_ERROR__"+String(e&&e.message?e.message:e);}})()';
-    if (window.XinyangRuntime && window.XinyangRuntime.evalScriptRaw) {
-      return window.XinyangRuntime.evalScriptRaw(script, { label: "加载磁吸模式宿主脚本" }).then(function (raw) {
-        raw = String(raw || "");
-        if (raw.indexOf("__SMART_SNAP_HOST_ERROR__") === 0 || raw.indexOf("__XY_SMART_ERROR__") === 0) throw new Error(raw.replace(/^__SMART_SNAP_HOST_ERROR__|^__XY_SMART_ERROR__/, ""));
-        if (raw.indexOf("__XY_SMART_OK__") !== 0) throw new Error("磁吸脚本返回异常：" + raw);
-        var parts = raw.slice(15).split("|"); return { processed: Number(parts[0]) || 0, xTarget: parts[1] || "未命中水平目标", yTarget: parts[2] || "未命中垂直目标" };
+  function runSmartSnap(enabled) {
+    if (busy) return;
+    var payload = typeof enabled === "boolean" ? { enabled: enabled } : {};
+    setBusy(true, "正在切换 PS 原生磁吸…");
+    function verify(requested, attempt) {
+      return new Promise(function (resolve) {
+        window.setTimeout(resolve, attempt ? 200 : 120);
+      }).then(function () {
+        return hostInvoke("toolsConfigureNativeSnap", { readOnly: true });
+      }).then(function (result) {
+        if (result.enabled === requested) return result;
+        if (attempt < 2) return verify(requested, attempt + 1);
+        throw new Error("PS 磁吸状态未确认；请检查“视图 > 对齐”，或使用“立即吸附”");
       });
     }
-    return new Promise(function (resolve, reject) {
-      cs.evalScript(script, function (raw) {
-        raw = String(raw || "");
-        if (raw.indexOf("__SMART_SNAP_HOST_ERROR__") === 0) reject(new Error(raw.slice(25)));
-        else if (raw.indexOf("__XY_SMART_OK__") === 0) { var parts = raw.slice(15).split("|"); resolve({ processed: Number(parts[0]) || 0, xTarget: parts[1] || "未命中水平目标", yTarget: parts[2] || "未命中垂直目标" }); }
-        else reject(new Error("磁吸脚本返回异常：" + raw));
-      });
-    });
+    return hostInvoke("toolsConfigureNativeSnap", payload).then(function (result) {
+      return result.verificationPending ? verify(result.requestedEnabled, 0) : result;
+    }).then(function (result) {
+      nativeSnapKnown = true;
+      config.smartSnapEnabled = !!result.enabled;
+      saveConfig(); restoreControls();
+      status(result.enabled ? "PS 原生磁吸已开启；目标请在“视图 > 对齐到”中选择" : "PS 原生磁吸已关闭");
+    }).catch(function (error) {
+      nativeSnapKnown = false;
+      restoreControls();
+      status("操作失败：" + errorText(error));
+    }).then(function () { setBusy(false); });
   }
 
-  function runSmartSnap() {
-    if (!config.smartSnapEnabled) {
-      config.smartSnapEnabled = true;
-      saveConfig(); updateSmartSnapCard();
-      status("磁吸模式已开启；移动图层后再次点击此按钮即可执行吸附");
-      return;
-    }
-    status("正在计算最近磁吸目标…");
-    invokeSmartSnapStandalone({ distance: config.smartSnapDistance, layerEdges: config.smartSnapLayerEdges, centers: config.smartSnapCenters, equalSpacing: config.smartSnapEqualSpacing, canvasEdges: config.smartSnapCanvasEdges, guides: config.smartSnapGuides }).then(function (result) {
-      status("磁吸完成：" + result.processed + " 个图层，" + (result.xTarget || "未命中水平目标") + "，" + (result.yTarget || "未命中垂直目标"));
-    }).catch(function (error) { status("磁吸模式加载失败：" + errorText(error)); });
+  function applySmartSnap() {
+    runHost("toolsApplySmartSnap", { distance: config.smartSnapDistance, layerEdges: config.smartSnapLayerEdges, centers: config.smartSnapCenters, equalSpacing: config.smartSnapEqualSpacing, canvasEdges: config.smartSnapCanvasEdges, guides: config.smartSnapGuides }, "正在计算最近磁吸目标…", function (result) {
+      if (!result.processed) return "未移动图层：附近无目标或已经对齐；可调整吸附距离与类型";
+      return "磁吸完成：" + result.processed + " 个图层，" + result.xTarget + "，" + result.yTarget;
+    }).catch(function () {});
+  }
+
+  function releaseMemory() {
+    runHost("toolsReleaseMemory", {}, "正在回收闲置脚本内存…", function () {
+      return "脚本回收完成；文档、撤销和剪贴板已保留。PS 图像缓存可能仍占用内存";
+    }).catch(function () {});
   }
 
   function toggleAutoFill(sourceNode) {
@@ -1066,6 +1087,14 @@
     else if (action === "file-slim") { var node = one("#tool-slim-run"); if (node) node.click(); }
     else if (action === "custom-transform") openDetail("quick-transform", sourceNode);
     else if (action === "export-image") runExportImage();
+    else if (action === "send-browser") {
+      setBusy(true, "正在导出图片并切换到浏览器…");
+      window.XinyangBrowserSend.send(hostInvoke, extensionRootPath()).then(function () {
+        status("已向浏览器粘贴图片，请检查对话附件；未自动提交。若未出现，请点输入框后按 Ctrl+V。");
+      }).catch(function (error) {
+        status("发送到浏览器失败：" + errorText(error));
+      }).then(function () { setBusy(false); });
+    }
     else if (action === "distribute") openDetail("distribute", sourceNode);
     else if (action === "replace-elements") runReplace();
     else if (action === "find-same") runFindSame(sourceNode);
@@ -1075,6 +1104,8 @@
     else if (action === "rectangle") openDetail("rectangle-set", sourceNode);
     else if (action === "pinyin") runPinyin();
     else if (action === "smart-snap") runSmartSnap();
+    else if (action === "smart-snap-apply") applySmartSnap();
+    else if (action === "release-memory") releaseMemory();
   }
 
   function loadConfig() {
@@ -1163,7 +1194,7 @@
     var exportWatermark = one("#tuniu-export-watermark"); if (exportWatermark) exportWatermark.value = config.exportWatermark;
     var exportOrigin = one("#tuniu-export-origin"); if (exportOrigin) exportOrigin.checked = !!config.exportOriginImage;
     var exportOpen = one("#tuniu-export-open-folder"); if (exportOpen) exportOpen.checked = !!config.exportOpenFolder;
-    var smartEnabled = one("#smart-snap-enabled"); if (smartEnabled) smartEnabled.checked = !!config.smartSnapEnabled;
+    var smartEnabled = one("#smart-snap-enabled"); if (smartEnabled) { smartEnabled.checked = !!config.smartSnapEnabled; smartEnabled.indeterminate = !nativeSnapKnown; }
     [10, 20, 30, 50].forEach(function (value) { var button = one('[data-smart-snap-distance="' + value + '"]'); if (button) button.classList.toggle("active", Number(config.smartSnapDistance) === value); });
     [["#smart-snap-layer-edges", "smartSnapLayerEdges"], ["#smart-snap-centers", "smartSnapCenters"], ["#smart-snap-equal-spacing", "smartSnapEqualSpacing"], ["#smart-snap-canvas-edges", "smartSnapCanvasEdges"], ["#smart-snap-guides", "smartSnapGuides"]].forEach(function (entry) { var node = one(entry[0]); if (node) node.checked = !!config[entry[1]]; });
     updateAutoFillCard();
@@ -1187,16 +1218,17 @@
     all("[data-common-scale]").forEach(function (button) { button.addEventListener("click", function () { runScale(button.getAttribute("data-common-scale")); closeZoomExtras(); }); });
     all("[data-common-align]").forEach(function (button) { button.addEventListener("click", function () { runAlign(button.getAttribute("data-common-align")); }); });
     all("[data-common-canvas-center]").forEach(function (button) { button.addEventListener("click", function () { runCanvasCenter(button.getAttribute("data-common-canvas-center")); }); });
+    all("[data-common-canvas-align]").forEach(function (button) { button.addEventListener("click", function () { runCanvasAlign(button.getAttribute("data-common-canvas-align")); }); });
     all("[data-common-even-distribute]").forEach(function (button) { button.addEventListener("click", function () { runEvenDistribute(button.getAttribute("data-common-even-distribute")); }); });
     all("[data-common-flip]").forEach(function (button) { button.addEventListener("click", function () { runFlip(button.getAttribute("data-common-flip")); }); });
     all("[data-find-same-type]").forEach(function (button) {
       button.addEventListener("click", function (event) { event.stopPropagation(); runFindSameType(button.getAttribute("data-find-same-type")); });
     });
     var smartEnabled = one("#smart-snap-enabled");
-    if (smartEnabled) smartEnabled.addEventListener("change", function () { config.smartSnapEnabled = !!smartEnabled.checked; saveConfig(); updateSmartSnapCard(); });
+    if (smartEnabled) smartEnabled.addEventListener("change", function () { runSmartSnap(!!smartEnabled.checked); });
     all("[data-smart-snap-distance]").forEach(function (button) { button.addEventListener("click", function () { config.smartSnapDistance = Number(button.getAttribute("data-smart-snap-distance")) || 20; all("[data-smart-snap-distance]").forEach(function (node) { node.classList.toggle("active", node === button); }); saveConfig(); }); });
     [["#smart-snap-layer-edges", "smartSnapLayerEdges"], ["#smart-snap-centers", "smartSnapCenters"], ["#smart-snap-equal-spacing", "smartSnapEqualSpacing"], ["#smart-snap-canvas-edges", "smartSnapCanvasEdges"], ["#smart-snap-guides", "smartSnapGuides"]].forEach(function (entry) { var node = one(entry[0]); if (node) node.addEventListener("change", function () { config[entry[1]] = !!node.checked; saveConfig(); }); });
-    document.addEventListener("keydown", function (event) { if (event.shiftKey && !event.ctrlKey && !event.altKey && String(event.key || "").toLowerCase() === "s") { var target = event.target || {}; if (/input|textarea|select/i.test(target.tagName || "")) return; event.preventDefault(); config.smartSnapEnabled = !config.smartSnapEnabled; saveConfig(); restoreControls(); status(config.smartSnapEnabled ? "磁吸模式已开启" : "磁吸模式已关闭"); } });
+    document.addEventListener("keydown", function (event) { if (event.shiftKey && !event.ctrlKey && !event.altKey && String(event.key || "").toLowerCase() === "s") { var target = event.target || {}; if (/input|textarea|select/i.test(target.tagName || "")) return; event.preventDefault(); runSmartSnap(); } });
     all("[data-zoom-submit]").forEach(function (button) {
       button.addEventListener("click", function (event) {
         event.stopPropagation();
