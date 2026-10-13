@@ -555,7 +555,7 @@ textarea[disabled] {
 .words-public-tools button,
 .words-action-toolbar button { height: 27px !important; }
 .words-inline-popover { margin-top: 5px !important; }
-.words-panel-header { min-height: 36px !important; }
+.words-panel-header { height: auto; min-height: 42px !important; }
 
 /* 常用功能顶部仅保留分隔线，不再使用四个线框容器。 */
 .common-zooms {

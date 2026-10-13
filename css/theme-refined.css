@@ -1,0 +1,311 @@
+/* Refined graphite and cool blue theme for the compact CEP panel. */
+:root {
+  --bg: #191b1f;
+  --panel: #292d33;
+  --panel-2: #22262b;
+  --border: #3b414a;
+  --border-strong: #535c68;
+  --text: #edf1f6;
+  --muted: #9ba5b2;
+  --accent: #6b9cff;
+  --accent-hover: #82adff;
+  --ui-bg: #191b1f;
+  --ui-nav: #1e2126;
+  --ui-surface-1: #22262b;
+  --ui-surface-2: #292d33;
+  --ui-surface-3: #333942;
+  --ui-input: #1d2025;
+  --ui-border: #3b414a;
+  --ui-border-hover: #586372;
+  --ui-border-focus: #80aaff;
+  --ui-text: #edf1f6;
+  --ui-text-2: #c1cad5;
+  --ui-text-3: #929daa;
+  --ui-accent: #6b9cff;
+  --ui-accent-hover: #82adff;
+  --ui-accent-pressed: #5685e2;
+  --ui-radius-xs: 5px;
+  --ui-radius-sm: 6px;
+  --ui-radius-md: 8px;
+  --ui-control-h: 32px;
+  --ui-focus-ring: 0 0 0 2px rgba(107, 156, 255, .2);
+}
+
+html,
+body,
+.app-shell,
+.app-main,
+.content {
+  background-color: var(--ui-bg) !important;
+}
+
+.panel-nav {
+  border-right-color: #30353d !important;
+  background: linear-gradient(180deg, #202329, #1d2025) !important;
+}
+
+.nav-button.active,
+html[data-initial-panel="bridge-panel"] .nav-button[data-panel="bridge-panel"] {
+  border-color: #405575 !important;
+  color: #fff !important;
+  background: #2b394e !important;
+}
+
+.nav-button.active::after {
+  background: var(--ui-accent) !important;
+}
+
+.nav-main-icon {
+  width: 19px !important;
+  height: 19px !important;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .16));
+}
+
+.tool-panel:not(.guides-panel) {
+  padding-right: 11px;
+  padding-left: 11px;
+}
+
+.ui-page-header,
+.panel-title-row,
+.words-panel-header,
+.common-tools-title {
+  border-bottom-color: #30353d !important;
+  background: rgba(27, 30, 35, .98) !important;
+}
+
+.width-selector,
+.spacing-panel,
+.text-panel,
+.text-options,
+.erase-controls,
+.settings-card,
+.settings-accordion,
+.framework-space,
+.framework-helper,
+.tool-detail,
+.words-hierarchy-editor,
+.bridge-card {
+  border-color: var(--ui-border) !important;
+  border-radius: var(--ui-radius-md) !important;
+  background: var(--ui-surface-1) !important;
+}
+
+.tool-panel input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
+.tool-panel select,
+.tool-panel textarea,
+.framework-input-component,
+.bridge-card input,
+.bridge-card select {
+  border-color: var(--ui-border) !important;
+  border-radius: var(--ui-radius-sm) !important;
+  background-color: var(--ui-input) !important;
+}
+
+.tool-panel input:focus,
+.tool-panel select:focus,
+.tool-panel textarea:focus,
+.framework-input-component:focus-within {
+  border-color: var(--ui-border-focus) !important;
+  box-shadow: var(--ui-focus-ring) !important;
+}
+
+.tool-panel button,
+.tool-panel .button,
+.tool-panel .mini-button,
+.tool-panel .tuniu-wide-button,
+.framework-bottom button,
+.framework-reset,
+#bridge-panel button {
+  border-radius: var(--ui-radius-sm) !important;
+  transition: background-color .12s ease, border-color .12s ease, color .12s ease, transform .06s ease;
+}
+
+.tool-panel .button.primary,
+.tool-panel .spacing-apply,
+.tool-panel #custom-doc-create,
+.tool-panel #recognize-text,
+.tool-panel #tool-slim-run,
+.framework-bottom button:not(:disabled),
+#bridge-panel .bridge-primary {
+  border-color: var(--ui-accent) !important;
+  color: #ffffff !important;
+  background: var(--ui-accent) !important;
+  font-weight: 650;
+}
+
+.tool-panel .button.primary:hover:not(:disabled),
+.tool-panel .spacing-apply:hover:not(:disabled),
+.tool-panel #custom-doc-create:hover:not(:disabled),
+.tool-panel #recognize-text:hover:not(:disabled),
+.tool-panel #tool-slim-run:hover:not(:disabled),
+.framework-bottom button:hover:not(:disabled),
+#bridge-panel .bridge-primary:hover:not(:disabled) {
+  border-color: var(--ui-accent-hover) !important;
+  color: #ffffff !important;
+  background: var(--ui-accent-hover) !important;
+}
+
+.framework-bottom button:not(:disabled),
+#bridge-panel .bridge-primary {
+  color: #ffffff !important;
+}
+
+.words-public-tools button,
+.words-action-toolbar button,
+.words-align-grid button,
+.common-align-row button,
+.common-layout-row button,
+.common-flip-row button {
+  border: 1px solid transparent !important;
+  border-radius: 6px !important;
+  color: #d3dbe6 !important;
+  background: transparent !important;
+  opacity: 1 !important;
+}
+
+.words-public-tools button:hover,
+.words-action-toolbar button:hover,
+.words-align-grid button:hover,
+.common-align-row button:hover,
+.common-layout-row button:hover,
+.common-flip-row button:hover {
+  border-color: #475365 !important;
+  color: #ffffff !important;
+  background: #303844 !important;
+}
+
+.words-public-tools button.active,
+.words-action-toolbar button.active,
+.words-align-grid button.active,
+.common-align-row button.active,
+.common-layout-row button.active,
+.common-flip-row button.active {
+  border-color: #5279b5 !important;
+  color: #ffffff !important;
+  background: #2c3b52 !important;
+}
+
+.words-public-tools svg,
+.words-action-toolbar svg,
+.words-align-grid svg {
+  width: 18px !important;
+  height: 18px !important;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.words-action-toolbar button > span {
+  display: inline-flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.words-action-toolbar .generate-button-icon {
+  width: 24px !important;
+  height: 21px !important;
+  overflow: visible;
+}
+
+.words-action-toolbar .generate-button-icon rect {
+  fill: #22262b;
+  stroke: currentColor;
+  stroke-width: 1.5;
+}
+
+.words-action-toolbar .generate-button-icon text {
+  fill: currentColor;
+  stroke: none;
+  font: 700 8px "Segoe UI", Arial, sans-serif;
+  letter-spacing: .35px;
+}
+
+.common-tool-icon {
+  border: 1px solid #3d4652 !important;
+  border-radius: 9px !important;
+  background: linear-gradient(145deg, #303640, #272c33) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .035);
+}
+
+.common-tool-button:hover .common-tool-icon {
+  border-color: #5a7398 !important;
+  background: linear-gradient(145deg, #394455, #2e3744) !important;
+}
+
+.common-tool-icon img,
+.common-align-row img,
+.common-layout-row img,
+.common-flip-row img {
+  width: 21px !important;
+  height: 21px !important;
+  object-fit: contain;
+}
+
+.common-align-row button,
+.common-layout-row button,
+.common-flip-row button {
+  min-height: 30px !important;
+}
+
+.tool-panel button[aria-pressed="true"],
+.tool-panel button[aria-selected="true"],
+.tool-panel button[aria-checked="true"],
+.tool-panel button.active,
+.tool-panel button.is-active {
+  border-color: #5279b5 !important;
+  color: #eaf1ff !important;
+  background: #2c3b52 !important;
+}
+
+.tool-panel button:focus-visible,
+.tool-panel input:focus-visible,
+.tool-panel select:focus-visible,
+#bridge-panel button:focus-visible {
+  outline: none !important;
+  box-shadow: var(--ui-focus-ring) !important;
+}
+
+.hint,
+.compact-hint,
+.settings-hint,
+#bridge-panel .bridge-hint {
+  border-left-color: #6687b8 !important;
+  color: #a6b1c0 !important;
+  background: #20252c !important;
+}
+
+#bridge-panel .bridge-heading .bridge-state[data-ready="true"] {
+  border-color: #3d7259;
+  color: #91dfb6 !important;
+  background: #20372e;
+}
+
+#bridge-panel .bridge-message {
+  color: #c4d5eb;
+}
+
+#bridge-panel .bridge-message.is-error {
+  color: #f0aaa5;
+}
+
+footer {
+  border-top-color: #30353d !important;
+  background: #1d2025 !important;
+}
+
+@media (max-width: 340px) {
+  .panel-nav { border-right-color: #30353d !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tool-panel button,
+  .tool-panel .button,
+  .nav-main-icon { transition: none !important; }
+}

@@ -1,0 +1,6 @@
+鑫洋助理 v2.3.20 回归修复测试报告
+问题：原生画板导出报 strTitle 未定义。Adobe ArtboardExport.inc 的 saveFileNow 在保存后用 strTitle 记录遥测；该变量由 ArtBoards To Files.jsx 入口提供。
+修复：在适配器局部作用域补齐 Adobe 入口上下文 strTitle、strMessage、running 和 ScriptFilePath，然后载入原生核心。单画布/参考线切片分支未修改。
+通过：runtime/diagnostics 语法；native-artboard-export 模块语法；原生适配和单画布切片模拟回归；直接从本机 Adobe 脚本读取 saveFileNow，在模拟 Photoshop API 下运行其真实 JPEG 分支，确认保存和 strTitle 遥测执行完成。
+限制：尚未执行真实 Photoshop 像素导出。本机原生函数验证使用模拟 saveAs，不代表文件已在 Photoshop 中导出。
+手工验收：重启 Photoshop 并打开插件，在多画板测试文档中导出切片，应输出各可见画板 JPG 且不再报 strTitle 未定义。核对 JPG 数量、尺寸和画板内容；源图层结构不变，无临时文档遗留；无画板主图和参考线切片行为不变。

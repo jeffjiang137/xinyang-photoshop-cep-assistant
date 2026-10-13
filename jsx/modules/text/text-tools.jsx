@@ -31,23 +31,26 @@ XinyangHostModules.textTools = function (deps) {
     var toolSolidColorHex = deps.toolSolidColorHex;
     var toolTextFormattingLayers = deps.toolTextFormattingLayers;
 
-    function toolsGetFonts() {
-        var fonts = [];
-        var index;
-        for (index = 0; index < app.fonts.length; index += 1) {
-            var font = app.fonts[index];
-            fonts.push({
-                postScriptName: String(font.postScriptName || font.name || ""),
-                family: String(font.family || font.name || ""),
-                style: String(font.style || "")
-            });
+    function toolsGetFonts(options) {
+        options = options || {};
+        var collection = app.fonts;
+        var total = collection.length;
+        var offset = Math.max(0, integerValue(options.offset, 0));
+        var limit = Math.max(1, Math.min(50, integerValue(options.limit, 50)));
+        if (options.expectedTotal !== undefined && Number(options.expectedTotal) !== total) {
+            return {fonts:[],total:total,nextOffset:0,hasMore:total>0,restart:true};
         }
-        fonts.sort(function (left, right) {
-            var a = (left.family + " " + left.style).toLowerCase();
-            var b = (right.family + " " + right.style).toLowerCase();
-            return a < b ? -1 : a > b ? 1 : 0;
-        });
-        return { fonts: fonts };
+        offset = Math.min(offset,total);
+        var end = Math.min(total,offset+limit), fonts = [];
+        var started = new Date().getTime(), index;
+        for (index=offset;index<end;index+=1) {
+            var font=collection[index];
+            fonts.push({postScriptName:String(font.postScriptName || font.name || ""),
+                family:String(font.family || font.name || ""),style:String(font.style || "")});
+            if (new Date().getTime()-started >= 40) { index += 1; break; }
+        }
+        // Keep native index order for stable page cursors. Sort only in the UI.
+        return {fonts:fonts,total:total,offset:offset,nextOffset:index,hasMore:index<total};
     }
 
     function textJustification(value) {
@@ -194,6 +197,51 @@ XinyangHostModules.textTools = function (deps) {
         var targetLayers = toolTextFormattingLayers(document, ids);
         var preparedColor = applyColor ? toolSolidColorFromHex(colorValue) : null;
         var isRealtime = !!options.realtime;
+        // Merge only requested character properties in one host action per layer.
+        // Do not replace textKey/style ranges: unrelated mixed styles must survive.
+        function applyCharacterStyle(layer, item) {
+            if (!(applyFont || applySize || applyTracking || applyLeading || applyColor ||
+                applyFauxBold || applyFauxItalic || applyAllCaps || applyOpticalKern)) return true;
+            try {
+                var key = stringIDToTypeID;
+                var style = new ActionDescriptor();
+                if (applyFont) style.putString(key("fontPostScriptName"), font);
+                if (applySize) style.putUnitDouble(key("size"), key("pointsUnit"), size);
+                if (applyTracking) style.putInteger(key("tracking"), tracking);
+                if (applyLeading) {
+                    var resolvedLeading = leadingPoints;
+                    if (!(resolvedLeading > 0)) {
+                        resolvedLeading = Math.max(1, Math.round(Number(item.size.as("pt")) *
+                            Math.max(0.5, Math.min(5, Number(options.leading || 1.2)))));
+                    }
+                    style.putBoolean(key("autoLeading"), false);
+                    style.putUnitDouble(key("leading"), key("pointsUnit"), resolvedLeading);
+                }
+                if (applyColor) {
+                    var color = new ActionDescriptor();
+                    color.putDouble(key("red"), preparedColor.rgb.red);
+                    color.putDouble(key("green"), preparedColor.rgb.green);
+                    color.putDouble(key("blue"), preparedColor.rgb.blue);
+                    style.putObject(key("color"), key("RGBColor"), color);
+                }
+                if (applyFauxBold) style.putBoolean(key("syntheticBold"), fauxBold);
+                if (applyFauxItalic) style.putBoolean(key("syntheticItalic"), fauxItalic);
+                if (applyAllCaps) style.putEnumerated(key("fontCaps"), key("fontCaps"), key(allCaps ? "allCaps" : "normal"));
+                if (applyOpticalKern) style.putEnumerated(key("autoKern"), key("autoKern"), key(opticalKern ? "opticalKern" : "metricsKern"));
+                var target = new ActionReference();
+                target.putProperty(key("property"), key("textStyle"));
+                target.putIdentifier(key("layer"), Number(layer.id));
+                var action = new ActionDescriptor();
+                action.putReference(key("null"), target);
+                action.putObject(key("to"), key("textStyle"), style);
+                executeAction(key("set"), action, DialogModes.NO);
+                return true;
+            } catch (ignoreCharacterStyleAction) {
+                // Older hosts retain the established DOM path.
+                return false;
+            }
+        }
+
 
         return suspendToolsHistory(document, "鑫洋助理：修改文字属性", function () {
             var processed = 0;
@@ -207,32 +255,34 @@ XinyangHostModules.textTools = function (deps) {
                     continue;
                 }
                 var item = layer.textItem;
-                if (applyFont) {
-                    try { item.font = font; } catch (fontError) { throw new Error("找不到字体：" + font); }
-                }
-                if (applySize) item.size = UnitValue(size, "pt");
-                if (applyTracking) item.tracking = tracking;
-                if (applyLeading) {
-                    var layerLeading = leadingPoints;
-                    if (!(layerLeading > 0)) {
-                        var currentSize = 48;
-                        try { currentSize = Number(item.size.as("pt")) || currentSize; } catch (ignoreCurrentSize) {}
-                        var ratio = Math.max(0.5, Math.min(5, Number(options.leading || 1.2)));
-                        layerLeading = Math.max(1, Math.round(currentSize * ratio));
+                if (!applyCharacterStyle(layer, item)) {
+                    if (applyFont) {
+                        try { item.font = font; } catch (fontError) { throw new Error("找不到字体：" + font); }
                     }
-                    try { item.useAutoLeading = false; } catch (ignoreAutoLeading) {}
-                    item.leading = UnitValue(layerLeading, "pt");
+                    if (applySize) item.size = UnitValue(size, "pt");
+                    if (applyTracking) item.tracking = tracking;
+                    if (applyLeading) {
+                        var layerLeading = leadingPoints;
+                        if (!(layerLeading > 0)) {
+                            var currentSize = 48;
+                            try { currentSize = Number(item.size.as("pt")) || currentSize; } catch (ignoreCurrentSize) {}
+                            var ratio = Math.max(0.5, Math.min(5, Number(options.leading || 1.2)));
+                            layerLeading = Math.max(1, Math.round(currentSize * ratio));
+                        }
+                        try { item.useAutoLeading = false; } catch (ignoreAutoLeading) {}
+                        item.leading = UnitValue(layerLeading, "pt");
+                    }
+                    if (applyColor) item.color = preparedColor;
+                    if (applyFauxBold) {
+                        try { item.fauxBold = fauxBold; } catch (ignoreFauxBold) {}
+                    }
+                    if (applyFauxItalic) {
+                        try { item.fauxItalic = fauxItalic; } catch (ignoreFauxItalic) {}
+                    }
+                    if (applyAllCaps) toolSetTextAllCaps(item, allCaps);
+                    if (applyOpticalKern) toolSetTextOpticalKern(item, opticalKern);
                 }
                 if (applyAlign && toolSetTextJustificationPreservePosition(layer, align)) positionPreserved += 1;
-                if (applyColor) item.color = preparedColor;
-                if (applyFauxBold) {
-                    try { item.fauxBold = fauxBold; } catch (ignoreFauxBold) {}
-                }
-                if (applyFauxItalic) {
-                    try { item.fauxItalic = fauxItalic; } catch (ignoreFauxItalic) {}
-                }
-                if (applyAllCaps) toolSetTextAllCaps(item, allCaps);
-                if (applyOpticalKern) toolSetTextOpticalKern(item, opticalKern);
                 processed += 1;
             }
             if (!processed) throw new Error("当前选区中没有可处理的文字图层");

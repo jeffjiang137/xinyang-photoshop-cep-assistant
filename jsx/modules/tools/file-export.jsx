@@ -21,7 +21,7 @@ XinyangHostModules.fileExport = function (deps) {
 
     function normalizeFileSlimOptions(options) {
         options = options || {};
-        var removeEmpty = options.removeEmptyLayer === true;
+        var removeEmpty = options.removeEmptyLayer === true || options.emptyLayers === true;
         return {
             metadata: options.metadata === true || options.slimSmartObject === true,
             emptyLayers: options.emptyLayers === true || removeEmpty,
@@ -52,6 +52,7 @@ XinyangHostModules.fileExport = function (deps) {
         var report = {
             emptyLayers: 0,
             emptyGroups: 0,
+            ungrouped: 0,
             hiddenLayers: 0,
             outsideLayers: 0,
             removed: 0,
@@ -65,21 +66,65 @@ XinyangHostModules.fileExport = function (deps) {
         };
         var MAX_DEEP_CLEAN_DEPTH = 32;
 
+        function withUnlockedLayer(layer, action) {
+            var states = [];
+            var current = layer;
+            var keys = ["allLocked", "pixelsLocked", "positionLocked", "transparentPixelsLocked"];
+            var i;
+            while (current && current.typename !== "Document") {
+                states.push({ layer: current, values: {} });
+                current = current.parent;
+            }
+            try {
+                for (i = states.length - 1; i >= 0; i -= 1) {
+                    var k;
+                    for (k = 0; k < keys.length; k += 1) {
+                        try {
+                            var value = states[i].layer[keys[k]];
+                            if (typeof value === "boolean") {
+                                states[i].values[keys[k]] = value;
+                                if (value) states[i].layer[keys[k]] = false;
+                            }
+                        } catch (ignoreUnsupportedLock) {}
+                    }
+                }
+                return action();
+            } finally {
+                for (i = 0; i < states.length; i += 1) {
+                    var j;
+                    for (j = keys.length - 1; j >= 0; j -= 1) {
+                        try {
+                            if (states[i].values[keys[j]] === true) states[i].layer[keys[j]] = true;
+                        } catch (ignoreRemovedLayerLock) {}
+                    }
+                }
+            }
+        }
+
+        function cleanupFailure(layer, error) {
+            report.skipped += 1;
+            var name = "图层/组";
+            try { name = String(layer.name); } catch (ignoreLayerName) {}
+            report.errors.push(name + "：" + String(error.message || error));
+        }
+
         function removeOne(layer, key) {
             try {
-                layer.remove();
+                withUnlockedLayer(layer, function () { layer.remove(); });
                 report[key] += 1;
                 report.removed += 1;
                 return true;
-            } catch (ignoreRemove) {
+            } catch (removeError) {
+                cleanupFailure(layer, removeError);
                 return false;
             }
         }
 
         function walkForLayerCleanup(container) {
+            var layers = layerSnapshot(container);
             var index;
-            for (index = container.layers.length - 1; index >= 0; index -= 1) {
-                var layer = container.layers[index];
+            for (index = layers.length - 1; index >= 0; index -= 1) {
+                var layer = layers[index];
                 if (options.hiddenLayers && !layer.visible) {
                     removeOne(layer, "hiddenLayers");
                     continue;
@@ -88,6 +133,17 @@ XinyangHostModules.fileExport = function (deps) {
                     walkForLayerCleanup(layer);
                     if (options.emptyGroups && layer.layers.length === 0) {
                         removeOne(layer, "emptyGroups");
+                    } else if (options.emptyGroups && layer.layers.length === 1) {
+                        try {
+                            withUnlockedLayer(layer, function () {
+                                app.activeDocument = mainDocument;
+                                selectLayersByIds([layer.id]);
+                                executeAction(stringIDToTypeID("ungroupLayersEvent"), new ActionDescriptor(), DialogModes.NO);
+                            });
+                            report.ungrouped += 1;
+                        } catch (ungroupError) {
+                            cleanupFailure(layer, ungroupError);
+                        }
                     }
                     continue;
                 }
@@ -193,10 +249,6 @@ XinyangHostModules.fileExport = function (deps) {
             }
         }
 
-        if (cleanMetadata) {
-            ensureXMPScript();
-        }
-
         if (cleanLayers) {
             suspendToolsHistory(
                 mainDocument,
@@ -209,6 +261,7 @@ XinyangHostModules.fileExport = function (deps) {
         }
 
         if (cleanMetadata) {
+            ensureXMPScript();
             app.activeDocument = mainDocument;
             cleanDocumentMetadata(mainDocument);
             clearDocumentAncestorsForAllLayers(mainDocument, mainDocument, 0);

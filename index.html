@@ -21,7 +21,7 @@
         var background = true;
         try {
           var saved = localStorage.getItem("longStitch.activePanel");
-          if (/^(stitch|framework|spacing|text|guides|document|typography|tools|settings)-panel$/.test(saved || "")) panel = saved;
+          if (/^(stitch|framework|spacing|text|guides|document|typography|tools|bridge|settings)-panel$/.test(saved || "")) panel = saved;
           background = localStorage.getItem("longStitch.backgroundRunning") !== "0";
         } catch (error) {}
         document.documentElement.setAttribute("data-initial-panel", panel);
@@ -48,7 +48,9 @@
 <link href="css/common-tools-grid.css?v=2.2.40" rel="stylesheet"/>
 <link href="css/framework.css?v=2.2.05" rel="stylesheet"/>
 <link href="css/ui-refresh.css?v=2.2.05" rel="stylesheet"/>
-<link href="css/ui-polish.css?v=2.2.05" rel="stylesheet"/>
+<link href="css/ui-polish.css?v=2.2.92-header1" rel="stylesheet"/>
+<link href="css/bridge.css?v=2.2.92-header1" rel="stylesheet"/>
+<link href="css/theme-refined.css?v=2.3.20" rel="stylesheet"/>
 </head>
 <body>
 <main class="app-shell">
@@ -77,6 +79,7 @@
 <img alt="" aria-hidden="true" class="nav-main-icon" src="assets/icons/navigation/tools.svg"/>
 <span class="nav-label">工具</span>
 </button>
+<button aria-label="PS 桥接" aria-selected="false" class="nav-button" data-panel="bridge-panel" type="button"><img alt="" aria-hidden="true" class="nav-main-icon" src="assets/icons/navigation/bridge.svg"/><span class="nav-label">桥接</span></button>
 <button aria-label="设置" aria-selected="false" class="nav-button nav-settings" data-panel="settings-panel" type="button">
 <img alt="" aria-hidden="true" class="nav-main-icon" src="assets/icons/navigation/settings.svg"/>
 <span class="nav-label">设置</span>
@@ -120,11 +123,15 @@
             智能切片
           </button>
 <p class="hint">
-            使用“存储为 Web 所用格式”压缩导出 JPG；有切片时逐切片导出，无切片时导出画布，画板文档逐画板导出。
-          </p>
+             使用“存储为 Web 所用格式”压缩导出 JPG；有切片时逐切片导出，无切片时导出画布，画板文档逐画板导出。
+           </p>
+<div class="slice-clear-row">
+<button class="button secondary" id="clear-document-guides" type="button">清除参考线</button>
+<button class="button secondary" id="clear-document-slices" type="button">清除切片</button>
+</div>
 <button class="button secondary full" id="export-slices" type="button">
-            导出切片
-          </button>
+             导出切片
+           </button>
 </section>
 <section aria-label="自定义框架面板" class="tool-panel framework-panel" id="framework-panel">
 <div class="ui-page-header"><div class="ui-page-heading"><strong>自定义框架</strong><span>按表达式快速生成规则版式</span></div></div>
@@ -267,7 +274,7 @@
           </p>
 </section>
 <section aria-label="参考线面板" class="tool-panel guides-panel" id="guides-panel">
-<iframe class="guide-page-frame" data-src="guide-native/index.html?v=2.2.05" id="guide-page-frame" src="about:blank" title="参考线"></iframe>
+<iframe class="guide-page-frame" data-src="guide-native/index.html?v=2.2.73" id="guide-page-frame" src="about:blank" title="参考线"></iframe>
 </section>
 <section aria-label="文档预设面板" class="tool-panel document-panel" id="document-panel">
 <div class="ui-page-header"><div class="ui-page-heading"><strong>文档预设</strong><span>常用电商尺寸与安全参考线</span></div></div>
@@ -290,7 +297,7 @@
 </details>
 </section><section aria-label="文字面板" class="tool-panel typography-panel" id="typography-panel">
 <div class="tuniu-words-panel">
-  <div class="words-panel-header">
+  <div class="words-panel-header ui-page-header">
     <div class="ui-page-heading"><strong>文字面板</strong><span>字体、字符样式与自动排版</span></div>
     <div class="words-header-actions">
       <button aria-label="识别当前选中文字图层属性" class="words-header-icon words-read-style-button" id="words-read-current-style" title="识别当前选中文字图层属性" type="button">
@@ -353,13 +360,13 @@
       </div>
 
       <div class="words-action-toolbar">
-        <button id="words-translate-button" title="翻译（右键展开设置）" type="button"><span>译</span></button>
+        <button id="words-translate-button" title="翻译（右键展开设置）" type="button"><span><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4.5 5.5h10m-5-2v2m4 0c-.7 4.1-3.4 7.1-7.2 9.2m1.1-6.4c1.7 2.8 4.1 4.8 7.3 6.1M14.5 19l3.2-8 3.3 8m-5.3-2.4h4.1"/></svg></span></button>
         <button id="words-structure-toggle" title="文本拆分/合并" type="button"><span>拆</span></button>
-        <button id="tool-text-generate-button" title="生成按钮（右键展开设置）" type="button"><span>▣</span></button>
+        <button id="tool-text-generate-button" title="生成按钮（右键展开设置）" type="button"><span><svg aria-hidden="true" class="generate-button-icon" viewBox="0 0 28 24"><rect x="2.5" y="4" width="23" height="16" rx="4"/><text x="14" y="15.1" text-anchor="middle">BTN</text></svg></span></button>
         <span class="words-tool-separator"></span>
-        <button id="tool-text-copy-style" title="复制文字属性" type="button"><span>⇧A</span></button>
-        <button id="tool-text-paste-style" title="粘贴文字属性" type="button"><span>⇩A</span></button>
-        <button id="words-text-direction" title="文字方向" type="button"><span>↕T</span></button>
+        <button id="tool-text-copy-style" title="复制文字属性" type="button"><span><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M8 7V4h11v14h-3M5 9h11v11H5zM8 15l2.2-5 2.1 5m-3.4-1.5h2.6"/></svg></span></button>
+        <button id="tool-text-paste-style" title="粘贴文字属性" type="button"><span><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M8 7V4h11v14h-3M5 9h11v11H5zM10.5 11v5m-2-2 2 2 2-2"/></svg></span></button>
+        <button id="words-text-direction" title="文字方向" type="button"><span><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 5v14m0-14 2.5 2.5M4 5 1.5 7.5m5 9L4 19l-2.5-2.5M10 7V5h11v2m-5.5-2v14m-3 0h6"/></svg></span></button>
       </div>
 
       <div class="words-inline-popover" hidden id="words-translate-panel">
@@ -473,6 +480,7 @@
 <div aria-label="画布居中与元素分布" class="common-layout-row">
 <button data-common-canvas-center="horizontal" title="基于画布水平居中" type="button"><img alt="" src="assets/icons/common-tools/canvas-center-horizontal.svg"/></button>
 <button data-common-canvas-center="vertical" title="基于画布垂直居中" type="button"><img alt="" src="assets/icons/common-tools/canvas-center-vertical.svg"/></button>
+<button data-common-canvas-align="top" title="基于画布顶部对齐" type="button"><img alt="" src="assets/icons/common-tools/canvas-align-top.svg"/></button>
 <button data-common-even-distribute="horizontal" title="多选元素水平分布" type="button"><img alt="" src="assets/icons/common-tools/distribute-horizontal.svg"/></button>
 <button data-common-even-distribute="vertical" title="多选元素垂直分布" type="button"><img alt="" src="assets/icons/common-tools/distribute-vertical.svg"/></button>
 </div>
@@ -496,6 +504,12 @@
 <button class="common-tool-button" data-common-action="embed-many" title="多选图片图层和一个图层组，按顺序逐一剪切适配" type="button">
 <span class="common-tool-icon"><img alt="" src="assets/icons/common-tools/import-many.svg"/></span>
 <span class="common-tool-label">嵌入多图片</span>
+</button>
+</div>
+<div class="common-tool-item" role="listitem">
+<button class="common-tool-button" data-common-action="send-browser" title="优先发送选区范围，其次选中图层，未选中图层时发送整个画布。原尺寸 Web PNG。请先在浏览器中点击对话输入框；会替换剪贴板内容。" type="button">
+<span class="common-tool-icon"><img alt="" src="assets/icons/common-tools/send-browser.svg"/></span>
+<span class="common-tool-label">发送到浏览器</span>
 </button>
 </div>
 <div class="common-tool-item" role="listitem">
@@ -593,18 +607,22 @@
 </button>
 </div>
 <div class="common-tool-item" role="listitem">
-<button aria-pressed="false" class="common-tool-button common-tool-snap" data-common-action="smart-snap" title="磁吸模式（Shift+S 开关；开启后点击可将当前图层吸附到最近目标）" type="button"><span aria-hidden="true" class="common-tool-icon common-tool-snap-icon">⌘</span><span class="common-tool-label">磁吸模式</span><span aria-hidden="true" class="common-tool-state"></span></button>
+<button class="common-tool-button" data-common-action="release-memory" title="仅回收闲置脚本对象，保留文档、撤销、剪贴板；不保证 PS 总内存下降" type="button"><span class="common-tool-icon" aria-hidden="true">♻</span><span class="common-tool-label">内存回收</span></button>
+</div>
+<div class="common-tool-item" role="listitem">
+<button aria-pressed="false" class="common-tool-button common-tool-snap" data-common-action="smart-snap" title="PS 原生磁吸开关（面板内 Shift+S）" type="button"><span aria-hidden="true" class="common-tool-icon common-tool-snap-icon">⌘</span><span class="common-tool-label">磁吸模式</span><span aria-hidden="true" class="common-tool-state"></span></button>
 <button aria-label="磁吸模式设置" class="common-tool-more" data-common-more="smart-snap" title="磁吸模式设置" type="button"><img alt="" src="assets/icons/common-tools/more.svg"/></button>
 </div>
 </div>
 </div>
 <div aria-hidden="true" class="common-tools-parameter-drawer drawer-collapsed" id="common-tools-parameter-drawer">
 <div class="tool-detail" data-tool-detail-view="smart-snap">
-<div class="tool-detail-title"><strong>磁吸模式</strong><span>Shift+S 开关；开启后点击按钮可吸附当前图层</span></div>
-<label class="single-check smart-snap-enabled"><input id="smart-snap-enabled" type="checkbox"/> 开启磁吸模式</label>
+<div class="tool-detail-title"><strong>磁吸模式</strong><span>拖动吸附使用 PS 原生设置；下方为手动校正</span></div>
+<label class="single-check smart-snap-enabled"><input id="smart-snap-enabled" type="checkbox"/> 开启 PS 原生磁吸</label>
+<button class="common-tool-button" data-common-action="smart-snap-apply" type="button">立即吸附当前图层</button>
 <div class="smart-snap-section"><span class="field-title">吸附距离</span><div aria-label="吸附距离" class="tuniu-segmented smart-snap-distance" role="radiogroup"><button data-smart-snap-distance="10" type="button">10px</button><button data-smart-snap-distance="20" type="button">20px</button><button data-smart-snap-distance="30" type="button">30px</button><button data-smart-snap-distance="50" type="button">50px</button></div></div>
 <div class="smart-snap-section"><span class="field-title">吸附类型</span><div class="tuniu-check-list smart-snap-types"><label><input id="smart-snap-layer-edges" type="checkbox"/> 图层边缘</label><label><input id="smart-snap-centers" type="checkbox"/> 中心线</label><label><input id="smart-snap-equal-spacing" type="checkbox"/> 等距</label><label><input id="smart-snap-canvas-edges" type="checkbox"/> 画布边缘</label><label><input id="smart-snap-guides" type="checkbox"/> 参考线</label></div></div>
-<p class="hint compact-hint">CEP 无法介入 Photoshop 正在进行的鼠标拖拽；移动完成后点击“磁吸模式”即可按当前设置校正到最近目标。可使用 Shift+S 快速开启或关闭。</p>
+<p class="hint compact-hint">拖动时吸附到的目标由“视图 > 对齐到”决定；中心及等距提示可在“视图 > 显示 > 智能参考线”开启。这里的距离和类型仅用于“立即吸附”，不改变 PS 拖动阈值。Shift+S 仅在面板有焦点时生效。</p>
 </div>
 <div class="tool-detail" data-tool-detail-view="embed-image">
 <div class="tool-detail-title"><strong>嵌入图片</strong><span>监听 Photoshop 插入与粘贴事件</span></div>
@@ -631,7 +649,7 @@
 <div class="tool-detail-title"><strong>文件瘦身</strong><span>兼容图牛方法映射</span></div>
 <div class="tuniu-check-list file-slim-options">
 <label title="递归打开智能对象并清理 DocumentAncestors 元数据；图层较多时会比较耗时"><input checked="" id="slim-metadata" type="checkbox"/> 优化智能对象</label>
-<label><input checked="" id="slim-empty-layers" type="checkbox"/> 删除全部空图层</label>
+<label title="递归删除空图层和空组，并自动取消只有一个图层的组；取消编组可能影响组级蒙版与混合效果"><input checked="" id="slim-empty-layers" type="checkbox"/> 删除全部空图层/组</label>
 <label><input id="slim-hidden-layers" type="checkbox"/> 删除全部隐藏图层</label>
 </div>
 <div class="tuniu-two-buttons file-slim-actions">
@@ -689,6 +707,16 @@
 </div>
 
 
+</section>
+<section aria-hidden="true" class="tool-panel" hidden="" id="bridge-panel">
+<div class="bridge-heading ui-page-header"><div class="ui-page-heading"><strong>PS 桥接</strong><span>本机连接与运行管理</span></div><span class="bridge-state" id="bridge-state" role="status">未启动</span></div>
+<p class="bridge-message" id="bridge-message" aria-live="polite">将本机 AI 工具连接到 Photoshop。</p>
+<div class="bridge-card"><h3>本机连接</h3><code class="bridge-address">127.0.0.1:32123</code>
+<div class="bridge-actions"><button class="bridge-primary" id="bridge-start" type="button">启动桥接</button><button id="bridge-stop" type="button" disabled="">停止桥接</button><button id="bridge-reconnect" type="button" disabled="">重新连接</button><button id="bridge-copy" type="button" disabled="">复制访问令牌</button></div>
+<p class="bridge-hint">仅接受本机连接。启动后可切换到其他功能继续使用；关闭鑫洋助理会断开连接。若旧 PS 桥接已启动，请先在旧插件中停止桥接。</p></div>
+<div class="bridge-card"><h3>Photoshop 操作</h3><div class="bridge-actions"><button id="bridge-inspect" type="button" disabled="">读取当前文档</button><button id="bridge-ocr" type="button" disabled="">OCR 识别图片</button></div><p class="bridge-hint">OCR 结果显示在下方，不自动创建或修改文字图层。</p></div>
+<div class="bridge-card"><h3>运行状态</h3><dl><dt>当前任务</dt><dd id="bridge-task">暂无运行任务</dd><dt>等待队列</dt><dd id="bridge-queue">0</dd><dt>内存状态</dt><dd id="bridge-memory">—</dd></dl><div class="bridge-actions"><button id="bridge-cancel" type="button" disabled="">取消当前任务</button><button id="bridge-release" type="button" disabled="">安全释放内存</button><button id="bridge-stop-recovery" type="button" disabled="">停止恢复任务</button><button id="bridge-export-logs" type="button" disabled="">导出内存日志</button></div></div>
+<details class="bridge-card"><summary>查看操作结果</summary><pre id="bridge-result">读取文档或识别图片后，在此查看结果。</pre></details>
 </section>
 <section aria-labelledby="settings-title" class="tool-panel settings-panel" id="settings-panel">
 <div class="ui-page-header"><div class="ui-page-heading"><strong>设置</strong><span>在线翻译、运行性能与本地服务</span></div></div>
@@ -838,7 +866,7 @@
 <p class="hint settings-hint">本机 OCR 不可用时调用；接口需返回文字内容与坐标框。</p>
 </div>
 </details>
-<p aria-live="polite" class="plugin-version" id="plugin-version">当前版本 v2.2.69</p>
+<p aria-live="polite" class="plugin-version" id="plugin-version">当前版本 v2.3.20</p>
 </section>
 </section>
 <footer aria-atomic="true" aria-live="polite" class="status-bar" role="status">
@@ -847,10 +875,11 @@
 </div>
 </main>
 <script src="js/CSInterface.js?v=2.2.05"></script>
-<script src="js/runtime.js?v=2.2.69"></script>
-<script src="js/diagnostics.js?v=2.2.69"></script>
-<script src="js/modules/settings/storage.js?v=2.2.69"></script>
-<script src="js/panel.js?v=2.2.69"></script>
-<script src="js/ui-polish.js?v=2.2.69"></script>
+<script src="js/modules/tools/browser-send.js?v=2.3.20"></script>
+<script src="js/runtime.js?v=2.3.20"></script>
+<script src="js/diagnostics.js?v=2.3.20"></script>
+<script src="js/modules/settings/storage.js?v=2.3.03"></script>
+<script src="js/panel.js?v=2.3.03"></script>
+<script src="js/ui-polish.js?v=2.3.03"></script>
 </body>
 </html>

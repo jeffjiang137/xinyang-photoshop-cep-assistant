@@ -26,6 +26,15 @@
 
       var fontsLoaded = false;
       var fontCatalog = [];
+      var fontLoadComplete = false;
+      var fontRequested = false;
+      var fontNextOffset = 0;
+      var fontTotal = null;
+      var fontSeen = {};
+      var fontLoadPromise = null;
+      var fontLoadFinish = null;
+      var fontPageTimer = 0;
+      var fontLoadGeneration = 0;
       var realtimeTextTimer = null;
       var realtimeTextBusy = false;
       var realtimeTextQueued = false;
@@ -321,7 +330,7 @@
         saveConfig();
       }
 
-      function populateFontStyles(preferredStyle) {
+      function populateFontStyles(preferredStyle, passive) {
         var family = nodeValue("#tool-font-family", config.fontFamily);
         var styles = fontCatalog.filter(function (font) { return String(font.family || "") === family; });
         var select = $("#tool-font-style");
@@ -334,10 +343,10 @@
           select.appendChild(option);
         });
         if (preferredStyle && styles.some(function (font) { return String(font.style || "") === String(preferredStyle); })) select.value = preferredStyle;
-        syncFontSelection();
+        if (!passive) syncFontSelection();
       }
 
-      function populateFontFamilies() {
+      function populateFontFamilies(passive) {
         var select = $("#tool-font-family");
         if (!select) return;
         var match = fontCatalog.filter(function (font) { return String(font.postScriptName || "") === String(config.font || ""); })[0];
@@ -351,43 +360,81 @@
           select.appendChild(option);
         });
         if (preferredFamily) select.value = preferredFamily;
-        populateFontStyles(preferredStyle);
-        setNodeValue("#tool-font-search", select.value || preferredFamily);
-        renderFontFamilyResults("");
+        populateFontStyles(preferredStyle, passive);
+        if (!passive) setNodeValue("#tool-font-search", select.value || preferredFamily);
+        renderFontFamilyResults(passive ? nodeValue("#tool-font-search", "") : "");
         renderQuickFonts();
       }
 
       function loadFonts(quiet, openAfter, queryAfterLoad) {
-        var preserveQuery = arguments.length >= 3;
-        var requestedQuery = preserveQuery ? String(queryAfterLoad || "") : "";
-        if (fontsLoaded) {
-          if (openAfter && !preserveQuery) {
-            openFontResultsFresh();
-          } else {
-            setNodeValue("#tool-font-search", requestedQuery || nodeValue("#tool-font-search", ""));
-            renderFontFamilyResults(requestedQuery || nodeValue("#tool-font-search", ""));
-            if (openAfter) setFontResultsOpen(true);
-          }
-          return;
+        fontRequested = true;
+        if (openAfter) {
+          if (arguments.length >= 3) setNodeValue("#tool-font-search", String(queryAfterLoad || ""));
+          else setNodeValue("#tool-font-search", "");
+          renderFontFamilyResults(nodeValue("#tool-font-search", ""));
+          setFontResultsOpen(true);
         }
-        if (isBusy()) return;
-        setBusy(true, quiet ? "正在准备文字面板…" : "正在读取 Photoshop 字体列表…");
-        hostInvoke("toolsGetFonts", {}).then(function (result) {
-          fontCatalog = result.fonts || [];
-          fontsLoaded = true;
-          populateFontFamilies();
-          if (openAfter) {
-            setNodeValue("#tool-font-search", requestedQuery);
-            renderFontFamilyResults(requestedQuery);
-            setFontResultsOpen(true);
+        if (fontLoadComplete) return Promise.resolve();
+        if (fontLoadPromise) return fontLoadPromise;
+        var generation = fontLoadGeneration;
+        // One page in flight, with a yield before the next host request. Font
+        // discovery must not hold the panel's global busy flag.
+        fontLoadPromise = new Promise(function (resolve) {
+          fontLoadFinish = function () {
+            if (fontPageTimer) window.clearTimeout(fontPageTimer);
+            fontPageTimer = 0;
+            fontLoadPromise = null;
+            fontLoadFinish = null;
+            resolve();
+          };
+          function finish() { if (fontLoadFinish) fontLoadFinish(); }
+          function nextPage() {
+            fontPageTimer = 0;
+            if (generation !== fontLoadGeneration || !typographyPanelIsActive()) { finish(); return; }
+            if (isBusy() || typographyWriteInFlight || realtimeTextBusy) {
+              fontPageTimer = window.setTimeout(nextPage, 160);
+              return;
+            }
+            var payload = {offset:fontNextOffset,limit:50};
+            if (fontTotal !== null) payload.expectedTotal = fontTotal;
+            hostInvoke("toolsGetFonts", payload).then(function (result) {
+              if (generation !== fontLoadGeneration) return;
+              if (result.restart) {
+                fontCatalog = []; fontSeen = {}; fontNextOffset = 0;
+                fontsLoaded = false; fontTotal = Number(result.total) || 0;
+              } else {
+                var nextOffset = Number(result.nextOffset);
+                if (!isFinite(nextOffset) || (result.hasMore && nextOffset <= fontNextOffset)) {
+                  throw new Error("字体分页进度异常，请重新加载插件");
+                }
+                (result.fonts || []).forEach(function (font) {
+                  var id = "$" + String(font.postScriptName || font.family + ":" + font.style);
+                  if (!fontSeen[id]) { fontSeen[id] = true; fontCatalog.push(font); }
+                });
+                fontNextOffset = nextOffset;
+                fontTotal = Number(result.total) || 0;
+                fontsLoaded = fontCatalog.length > 0 || !result.hasMore;
+                fontLoadComplete = !result.hasMore;
+              }
+              // Updating available choices must not change the current search,
+              // chosen font or text formatting as additional pages arrive.
+              populateFontFamilies(true);
+              if (typographyPanelIsActive() && !isBusy()) {
+                status(fontLoadComplete ? "已读取 " + fontCatalog.length + " 个 Photoshop 字体" :
+                  "字体加载中：" + fontNextOffset + " / " + fontTotal + "，已加载字体可直接选择");
+              }
+              if (fontLoadComplete) finish();
+              else fontPageTimer = window.setTimeout(nextPage, 100);
+            }).catch(function (error) {
+              if (generation === fontLoadGeneration) {
+                status("字体读取暂停，重新打开字体选择器可继续：" + humanError(error));
+                finish();
+              }
+            });
           }
-          status("已读取 " + fontCatalog.length + " 个 Photoshop 字体");
-        }).catch(function (error) {
-          status("读取字体失败：" + humanError(error));
-        }).then(function () {
-          setBusy(false);
-          if (quiet) requestTypographyRefresh("fonts-ready", 180);
+          fontPageTimer = window.setTimeout(nextPage, 0);
         });
+        return fontLoadPromise;
       }
 
       function addRecentFont(family) {
@@ -398,10 +445,20 @@
       }
 
       function selectFontFamily(family) {
+        if (!fontsLoaded) {
+          var loading = loadFonts(false);
+          if (loading) loading.then(function () { if (fontsLoaded) selectFontFamily(family); });
+          return;
+        }
         var select = $("#tool-font-family");
         if (!select || !family) return;
         var exists = Array.prototype.some.call(select.options, function (option) { return option.value === family; });
-        if (!exists) return;
+        if (!exists) {
+          if (!fontLoadComplete) loadFonts(false).then(function () {
+            if (fontLoadComplete) selectFontFamily(family);
+          });
+          return;
+        }
         select.value = family;
         config.fontFamily = family;
         setNodeValue("#tool-font-search", family);
@@ -611,7 +668,7 @@
         config.opticalKern = !!style.opticalKern;
         config.textDirection = style.direction || "horizontal";
         restoreWordsUi();
-        if (fontsLoaded) populateFontFamilies();
+        if (fontsLoaded) populateFontFamilies(true);
         saveConfig();
         if (!quiet) status("已识别文字属性：" + (result.layerName || "当前图层"));
         if (after) after(result);
@@ -630,7 +687,6 @@
 
       function readCurrentTextStyle(after, quiet) {
         if (textStyleReadInFlight || typographyRefreshInFlight || typographyWriteInFlight || (!quiet && isBusy())) return;
-        var shouldLoadFonts = !fontsLoaded;
         var readRevision = textFormattingRevision;
         textStyleReadInFlight = true;
         if (!quiet) setBusy(true, "正在识别当前选中文字图层属性…");
@@ -643,12 +699,10 @@
           recordTypographySnapshotPerformance(result);
           applyTypographySnapshot(result, after, quiet);
         }).catch(function (error) {
-          shouldLoadFonts = false;
           if (!quiet) status("识别文字属性失败：" + humanError(error));
         }).then(function () {
           textStyleReadInFlight = false;
           if (!quiet) setBusy(false);
-          if (shouldLoadFonts && !fontsLoaded) window.setTimeout(function () { loadFonts(true); }, 20);
         });
       }
 
@@ -814,7 +868,7 @@
 
       function runRealtimeTextFormatting() {
         if (!realtimeTextReady) return;
-        if (isBusy() || realtimeTextBusy) {
+        if (isBusy() || realtimeTextBusy || typographyWriteInFlight) {
           realtimeTextQueued = true;
           window.clearTimeout(realtimeTextTimer);
           realtimeTextTimer = window.setTimeout(runRealtimeTextFormatting, 250);
@@ -930,12 +984,26 @@
         }).then(function () { setBusy(false); });
       }
 
+      function beginAlignmentWrite(message) {
+        typographyWriteInFlight = true;
+        typographyRefreshRequestId += 1;
+        if (typographyRefreshTimer) window.clearTimeout(typographyRefreshTimer);
+        typographyRefreshTimer = 0;
+        setBusy(true, message);
+      }
+
+      function finishAlignmentWrite() {
+        typographyWriteInFlight = false;
+        setBusy(false);
+        requestTypographyRefresh("alignment-complete", 180);
+      }
+
       function runWordsAlignment(action) {
         if (isBusy()) return;
-        setBusy(true, "正在对齐文字图层…");
+        beginAlignmentWrite("正在对齐文字图层…");
         hostInvoke("toolsAlignLayers", { action: action }).then(function (result) {
           status("已对齐 " + (result.processed || 0) + " 个图层");
-        }).catch(function (error) { status("对齐失败：" + humanError(error)); }).then(function () { setBusy(false); });
+        }).catch(function (error) { status("对齐失败：" + humanError(error)); }).then(finishAlignmentWrite);
       }
 
       function runWordsDistribute(axis) {
@@ -948,10 +1016,12 @@
 
       function runWordsCanvas(axis) {
         if (isBusy()) return;
-        setBusy(true, "正在对齐画布…");
-        hostInvoke("toolsCenterLayersOnCanvas", { axis: axis }).then(function (result) {
+        axis = axis === "vertical" ? "vertical" : "horizontal";
+        beginAlignmentWrite("正在对齐画布…");
+        var method = axis === "vertical" ? "toolsCenterLayersVerticallyOnCanvasV2309" : "toolsCenterLayersHorizontallyOnCanvas";
+        hostInvoke(method, {}).then(function (result) {
           status("已将 " + (result.processed || 0) + " 个图层居中到画布");
-        }).catch(function (error) { status("画布对齐失败：" + humanError(error)); }).then(function () { setBusy(false); });
+        }).catch(function (error) { status("画布对齐失败：" + humanError(error)); }).then(finishAlignmentWrite);
       }
 
       function runWordsGap() {
@@ -1177,8 +1247,9 @@
       var typographyNav = document.querySelector('.nav-button[data-panel="typography-panel"]');
       if (typographyNav) typographyNav.addEventListener("click", function () {
         ensureTextSelectionListener();
-        if (!fontsLoaded) loadFonts(true);
-        else requestTypographyRefresh("panel-open", 180);
+        // Font enumeration is only needed when opening the font picker.
+        // ensureTextSelectionListener already schedules the lightweight snapshot.
+        if (fontRequested && !fontLoadComplete) loadFonts(true);
       });
 
       bindNode("#tool-load-fonts", "click", function (event) {
@@ -1190,18 +1261,18 @@
           return;
         }
         if (fontsLoaded) openFontResultsFresh();
-        else loadFonts(false, true);
+        if (!fontLoadComplete) loadFonts(false, true);
       });
       bindNode("#tool-font-search", "focus", function () {
         var results = $("#tool-font-results");
         if (results && results.classList.contains("open")) return;
         if (fontsLoaded) openFontResultsFresh();
-        else loadFonts(true, true);
+        if (!fontLoadComplete) loadFonts(true, true);
       });
       bindNode("#tool-font-search", "input", function () {
         var query = nodeValue("#tool-font-search", "");
-        if (!fontsLoaded) loadFonts(true, true, query);
-        else { renderFontFamilyResults(query); setFontResultsOpen(true); }
+        renderFontFamilyResults(query); setFontResultsOpen(true);
+        if (!fontLoadComplete) loadFonts(true, true, query);
       });
       bindNode("#tool-font-search", "keydown", function (event) {
         if (event.key === "Escape" || event.keyCode === 27) setFontResultsOpen(false);
@@ -1278,7 +1349,7 @@
         if (main) toggleHidden(main, !showSettings); if (settings) toggleHidden(settings, showSettings);
         if (toggle) { toggle.classList.toggle("active", showSettings); toggle.setAttribute("aria-pressed", showSettings ? "true" : "false"); }
       });
-      bindNode("#words-quick-font-selector", "click", function (event) { event.stopPropagation(); var menu=$("#words-quick-font-menu"); closeWordsPopovers(menu); toggleHidden(menu); });
+      bindNode("#words-quick-font-selector", "click", function (event) { event.stopPropagation(); var menu=$("#words-quick-font-menu"); closeWordsPopovers(menu); toggleHidden(menu); if (!fontLoadComplete) loadFonts(false); });
       bindNode("#words-quick-font-menu", "click", function (event) {
         var remove = event.target.closest("[data-remove-quick-font]");
         if (remove) { event.stopPropagation(); config.quickFonts.splice(Number(remove.getAttribute("data-remove-quick-font")),1); config.quickFontIndex=0; renderQuickFonts(); saveConfig(); return; }
@@ -1373,6 +1444,8 @@
       }
 
       function destroyTypographyStateController() {
+        fontLoadGeneration += 1;
+        if (fontLoadFinish) fontLoadFinish();
         removeTextSelectionListener();
         if (realtimeTextTimer) window.clearTimeout(realtimeTextTimer);
         realtimeTextTimer = null;

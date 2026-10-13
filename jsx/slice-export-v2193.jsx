@@ -1,7 +1,17 @@
-/* 鑫洋助理 v2.2.69 - 独立 Web 切片/画板/画布导出入口
+/* 鑫洋助理 v2.3.20 - 独立 Web 切片/画板/画布导出入口
  * 目的：绕过长期驻留 CEP 会话中的旧 LongStitchCEP 方法表，避免“未知功能”。
  */
 var XinyangSliceExportV2193 = (function () {
+    var sliceScriptFile = File($.fileName);
+    function exportNativeArtboards(document, folder, quality, singleSquare) {
+        var loader = $.global.XinyangHostModuleLoader;
+        if (!loader) {
+            $.evalFile(File(sliceScriptFile.parent.fsName + "/module-loader.jsx"));
+            loader = $.global.XinyangHostModuleLoader;
+        }
+        loader.loadOne(sliceScriptFile, "modules/stitch/native-artboard-export.jsx");
+        return $.global.XinyangHostModules.nativeArtboardExport().exportJpeg(document, folder, quality, singleSquare);
+    }
     function escapeJsonString(value) {
         var escapes = {"\b":"\\b","\t":"\\t","\n":"\\n","\f":"\\f","\r":"\\r","\"":"\\\"","\\":"\\\\"};
         return "\"" + String(value).replace(/[\\\"\u0000-\u001f]/g, function (character) {
@@ -190,9 +200,9 @@ var XinyangSliceExportV2193 = (function () {
         if (!layer || layer.typename !== "LayerSet") return null;
         try {
             app.activeDocument = document;
-            document.activeLayer = layer;
+            // Read by ID: activating a hidden group can reveal it before export.
             var reference = new ActionReference();
-            reference.putEnumerated(stringIDToTypeID("layer"), stringIDToTypeID("ordinal"), stringIDToTypeID("targetEnum"));
+            reference.putIdentifier(stringIDToTypeID("layer"), layer.id);
             var descriptor = executeActionGet(reference);
             var enabledKey = stringIDToTypeID("artboardEnabled");
             if (!descriptor.hasKey(enabledKey) || !descriptor.getBoolean(enabledKey)) return null;
@@ -236,21 +246,15 @@ var XinyangSliceExportV2193 = (function () {
 
     function collectDocumentArtboards(document) {
         var previousDocument = app.activeDocument;
-        var selectedIds = [];
         var output = [];
         try {
             app.activeDocument = document;
-            try { selectedIds = selectedLayerIds(); } catch (ignoreSelectedArtboards) {}
             var index;
             for (index = 0; index < document.layers.length; index += 1) {
                 var item = sliceArtboardInfo(document, document.layers[index], output.length + 1);
                 if (item) output.push(item);
             }
         } finally {
-            try {
-                app.activeDocument = document;
-                if (selectedIds.length) selectLayersByIds(selectedIds);
-            } catch (ignoreRestoreArtboardSelection) {}
             try { app.activeDocument = previousDocument; } catch (ignoreRestoreArtboardDocument) {}
         }
         output.sort(function (left, right) {
@@ -263,6 +267,31 @@ var XinyangSliceExportV2193 = (function () {
         if (!slices || slices.length !== 1) return false;
         var item = slices[0];
         return item.left <= 0 && item.top <= 0 && item.right >= canvasWidth && item.bottom >= canvasHeight;
+    }
+
+    function removeCanvasSliceWhenExportingMultiple(slices, canvasWidth, canvasHeight) {
+        if (!slices || slices.length < 2) return slices || [];
+
+        var hasPartialSlice = false;
+        var index;
+        for (index = 0; index < slices.length; index += 1) {
+            var item = slices[index];
+            if (item.left > 0 || item.top > 0 || item.right < canvasWidth || item.bottom < canvasHeight) {
+                hasPartialSlice = true;
+                break;
+            }
+        }
+        if (!hasPartialSlice) return slices;
+
+        /* Photoshop 会附带一张覆盖画布的自动切片。只要存在实际切片，
+         * 该项导出后就是多余的整张长图，必须排除。 */
+        var output = [];
+        for (index = 0; index < slices.length; index += 1) {
+            item = slices[index];
+            if (item.left <= 0 && item.top <= 0 && item.right >= canvasWidth && item.bottom >= canvasHeight) continue;
+            output.push(item);
+        }
+        return output;
     }
 
     function sliceSafeFileName(value, fallback) {
@@ -299,6 +328,40 @@ var XinyangSliceExportV2193 = (function () {
         } finally {
             app.backgroundColor = previous;
         }
+    }
+
+    /*
+     * 不使用 duplicate(name, true) 直接生成合并副本。部分 Photoshop
+     * 版本会在该路径中错误地把隐藏图层并入结果。保留临时副本的图层，
+     * 逐层复写原文档的可见性后再由导出流程合并，原文档不会被修改。
+     */
+    function copyLayerVisibility(sourceContainer, targetContainer) {
+        var count = Math.min(sourceContainer.layers.length, targetContainer.layers.length);
+        var index;
+        for (index = 0; index < count; index += 1) {
+            var sourceLayer = sourceContainer.layers[index];
+            var targetLayer = targetContainer.layers[index];
+            if (
+                sourceLayer.typename === "LayerSet" &&
+                targetLayer.typename === "LayerSet"
+            ) {
+                copyLayerVisibility(sourceLayer, targetLayer);
+            }
+            // Restore parents last so child visibility cannot reveal a hidden group.
+            try { targetLayer.visible = !!sourceLayer.visible; } catch (ignoreCopySliceVisibility) {}
+        }
+    }
+
+    function duplicateForSliceExport(sourceDocument, name) {
+        var temporary = sourceDocument.duplicate(name);
+        try {
+            copyLayerVisibility(sourceDocument, temporary);
+        } catch (error) {
+            try { temporary.close(SaveOptions.DONOTSAVECHANGES); } catch (ignoreCloseFailedDuplicate) {}
+            try { app.activeDocument = sourceDocument; } catch (ignoreRestoreSource) {}
+            throw error;
+        }
+        return temporary;
     }
 
     function sliceSaveForWebJpeg(document, outputFile, quality) {
@@ -347,6 +410,15 @@ var XinyangSliceExportV2193 = (function () {
         descriptor.putReference(stringIDToTypeID("target"), reference);
         descriptor.putClass(stringIDToTypeID("using"), stringIDToTypeID("guides"));
         executeAction(stringIDToTypeID("make"), descriptor, DialogModes.NO);
+    }
+
+    function clearDocumentSlices() {
+        if (!app.documents.length) throw new Error("请先打开 Photoshop 文档");
+        var document = app.activeDocument;
+        var removed = 0;
+        try { removed = collectDocumentSlices(document).length; } catch (ignoreCountSlices) {}
+        clearAllDocumentSlices();
+        return { removed: removed };
     }
 
     function makeExportSlicesFromGuides(document) {
@@ -462,6 +534,7 @@ var XinyangSliceExportV2193 = (function () {
             guideSliceInfo = makeExportSlicesFromGuides(sourceDocument);
             try { slices = collectDocumentSlices(sourceDocument) || []; }
             catch (ignoreCollectDocumentSlices) { slices = []; sliceReadFallback = true; }
+            slices = removeCanvasSliceWhenExportingMultiple(slices, canvasWidth, canvasHeight);
         }
         var mode = "slices";
         if (artboards.length) mode = "artboards";
@@ -470,19 +543,38 @@ var XinyangSliceExportV2193 = (function () {
             slices = [];
         }
 
+        var plannedOutputCount = mode === "canvas" ? 1 : 0;
+        var singleSquareExport = mode === "canvas" && canvasWidth === canvasHeight;
+        var plannedItems = mode === "artboards" ? artboards : slices;
+        var plannedIndex;
+        if (mode !== "canvas") {
+            for (plannedIndex = 0; plannedIndex < plannedItems.length; plannedIndex += 1) {
+                var plannedWidth = plannedItems[plannedIndex].right - plannedItems[plannedIndex].left;
+                var plannedHeight = plannedItems[plannedIndex].bottom - plannedItems[plannedIndex].top;
+                if (plannedWidth > 0 && plannedHeight > 0) {
+                    plannedOutputCount += 1;
+                    singleSquareExport = plannedOutputCount === 1 && plannedWidth === plannedHeight;
+                }
+            }
+        }
+        singleSquareExport = plannedOutputCount === 1 && singleSquareExport;
+
         var baseExportFolderName = mode === "artboards"
             ? "画板导出"
             : (canvasWidth === 790 ? "详情页切片" : (canvasWidth === 1920 ? "首页切片" : "切片"));
         var exportFolderName = baseExportFolderName;
-        var exportFolder = new Folder(selectedFolder.fsName + "/" + exportFolderName);
+        var exportFolder = selectedFolder;
         var folderSerial = 2;
-        while (exportFolder.exists) {
-            exportFolderName = baseExportFolderName + "_" + folderSerial;
+        if (!singleSquareExport) {
             exportFolder = new Folder(selectedFolder.fsName + "/" + exportFolderName);
-            folderSerial += 1;
-            if (folderSerial > 10000) throw new Error("同名导出文件夹过多，请更换导出位置");
+            while (exportFolder.exists) {
+                exportFolderName = baseExportFolderName + "_" + folderSerial;
+                exportFolder = new Folder(selectedFolder.fsName + "/" + exportFolderName);
+                folderSerial += 1;
+                if (folderSerial > 10000) throw new Error("同名导出文件夹过多，请更换导出位置");
+            }
+            if (!exportFolder.create()) throw new Error("无法创建导出文件夹：" + exportFolder.fsName);
         }
-        if (!exportFolder.create()) throw new Error("无法创建导出文件夹：" + exportFolder.fsName);
 
         var previousDialogs = app.displayDialogs;
         var previousUnits = app.preferences.rulerUnits;
@@ -496,36 +588,25 @@ var XinyangSliceExportV2193 = (function () {
             var index;
             if (mode === "canvas") {
                 app.activeDocument = sourceDocument;
-                var canvasFile = sliceUniqueOutputFile(exportFolder, "画布", "jpg");
+                var canvasFile = sliceUniqueOutputFile(exportFolder, singleSquareExport ? "主图" : "画布", "jpg");
                 sliceSaveForWebJpeg(sourceDocument, canvasFile, webQuality, false);
                 exportedFiles.push(canvasFile.name);
             } else if (mode === "artboards") {
-                flattenedSource = sourceDocument.duplicate("__鑫洋Web导出源_v2193__", true);
-                try { if (flattenedSource.mode !== DocumentMode.RGB) flattenedSource.changeMode(ChangeMode.RGB); } catch (ignoreSliceExportMode) {}
-                try { flattenedSource.bitsPerChannel = BitsPerChannelType.EIGHT; } catch (ignoreSliceExportBits) {}
-                for (index = 0; index < artboards.length; index += 1) {
-                    var board = artboards[index];
-                    if (!(board.right > board.left && board.bottom > board.top)) continue;
-                    app.activeDocument = flattenedSource;
-                    outputDocument = flattenedSource.duplicate("__画板_" + (index + 1) + "__", true);
-                    outputDocument.crop([
-                        UnitValue(board.left, "px"), UnitValue(board.top, "px"),
-                        UnitValue(board.right, "px"), UnitValue(board.bottom, "px")
-                    ]);
-                    var boardFile = sliceUniqueOutputFile(exportFolder, sliceSafeFileName(board.name, "画板_" + (index + 1)), "jpg");
-                    sliceSaveForWebJpeg(outputDocument, boardFile, webQuality, false, true);
-                    exportedFiles.push(boardFile.name);
-                    outputDocument.close(SaveOptions.DONOTSAVECHANGES);
-                    outputDocument = null;
-                }
+                exportedFiles = exportNativeArtboards(sourceDocument, exportFolder, webQuality, singleSquareExport);
             } else {
                 /*
                  * 不使用 Save for Web 的 allSlices 分支。该分支在部分新版
                  * Photoshop 中会影响原生“导出 Web 所用格式”面板。只创建一
                  * 个临时副本，在同一历史基线中裁切、导出、回退，避免反复开关
                  * 新画布，也不生成 images 子目录。
+                */
+                flattenedSource = duplicateForSliceExport(sourceDocument, "__鑫洋切片导出源__");
+                app.activeDocument = flattenedSource;
+                /*
+                 * duplicate 会连同原文档的切片标记一起复制。若不清除，
+                 * Save for Web 仍会自动额外创建 images 目录，造成重复切片。
                  */
-                flattenedSource = sourceDocument.duplicate("__鑫洋切片导出源__", true);
+                try { clearAllDocumentSlices(); } catch (ignoreClearTemporarySlices) {}
                 try { if (flattenedSource.mode !== DocumentMode.RGB) flattenedSource.changeMode(ChangeMode.RGB); } catch (ignoreSliceExportMode) {}
                 try { flattenedSource.bitsPerChannel = BitsPerChannelType.EIGHT; } catch (ignoreSliceExportBits) {}
                 fillDocumentWhite(flattenedSource);
@@ -543,7 +624,7 @@ var XinyangSliceExportV2193 = (function () {
                         UnitValue(left, "px"), UnitValue(top, "px"),
                         UnitValue(right, "px"), UnitValue(bottom, "px")
                     ]);
-                    var outputFile = sliceUniqueOutputFile(exportFolder, "切片_" + (exportedFiles.length + 1), "jpg");
+                    var outputFile = sliceUniqueOutputFile(exportFolder, singleSquareExport ? "主图" : "切片_" + (exportedFiles.length + 1), "jpg");
                     sliceSaveForWebJpeg(flattenedSource, outputFile, webQuality, false, false);
                     exportedFiles.push(outputFile.name);
                     flattenedSource.activeHistoryState = sliceBaseHistory;
@@ -556,6 +637,7 @@ var XinyangSliceExportV2193 = (function () {
                 folder: exportFolder.fsName,
                 files: exportedFiles.slice(0, 50),
                 mode: mode,
+                exporter: mode === "artboards" ? "photoshop-native" : "save-for-web",
                 format: "jpg",
                 quality: webQuality,
                 sourceFolder: selectedFolder.fsName,
@@ -581,6 +663,7 @@ var XinyangSliceExportV2193 = (function () {
             var data;
             if (action === "defaultFolder") data = getDefaultFolder();
             else if (action === "export") data = exportAssets(payload);
+            else if (action === "clearSlices") data = clearDocumentSlices();
             else throw new Error("未知独立导出操作：" + action);
             return toJson({ ok: true, data: data });
         } catch (error) {
@@ -591,7 +674,7 @@ var XinyangSliceExportV2193 = (function () {
     }
 
     return {
-        version: "2.2.69",
+        version: "2.3.20",
         invoke: invoke
     };
 }());

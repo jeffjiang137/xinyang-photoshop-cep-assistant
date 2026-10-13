@@ -14,6 +14,7 @@ XinyangHostModules.coreLayers = function (deps) {
     var selectLayersByIds = deps.selectLayersByIds;
 
     var toolTextFormattingLayerCache = null;
+    var toolLayerLookupCache = null;
 
     function findLayerById(container, id) {
         var index;
@@ -36,10 +37,39 @@ XinyangHostModules.coreLayers = function (deps) {
     }
 
     function toolLayersByIdsWithoutSelection(document, ids) {
+        var documentKey;
         var wanted = {};
         var found = {};
         var output = [];
         var index;
+
+        try {
+            documentKey = currentDocumentId();
+        } catch (ignoreLayerLookupDocumentId) {
+            documentKey = document;
+        }
+
+        if (toolLayerLookupCache &&
+            toolLayerLookupCache.document === document &&
+            toolLayerLookupCache.documentKey === documentKey) {
+            var cachedValid = true;
+            for (index = 0; index < ids.length; index += 1) {
+                var cachedLayer = toolLayerLookupCache.found["id_" + ids[index]];
+                try {
+                    if (!cachedLayer || Number(cachedLayer.id) !== Number(ids[index])) {
+                        cachedValid = false;
+                        break;
+                    }
+                } catch (ignoreCachedLayer) {
+                    cachedValid = false;
+                    break;
+                }
+                output.push(cachedLayer);
+            }
+            if (cachedValid && output.length === ids.length) return output;
+            output = [];
+        }
+
         for (index = 0; index < ids.length; index += 1) {
             wanted["id_" + ids[index]] = true;
         }
@@ -54,6 +84,11 @@ XinyangHostModules.coreLayers = function (deps) {
             }
         }
         walk(document);
+        toolLayerLookupCache = {
+            document: document,
+            documentKey: documentKey,
+            found: found
+        };
         for (index = 0; index < ids.length; index += 1) {
             output.push(found["id_" + ids[index]] || null);
         }

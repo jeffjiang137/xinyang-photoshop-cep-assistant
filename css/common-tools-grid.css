@@ -264,7 +264,7 @@
 /* v2.1.5：画布居中与多选元素等间距分布，高对比图标 */
 .common-layout-row {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 5px;
   margin: -8px -2px 13px;
   padding: 0 5px 8px;

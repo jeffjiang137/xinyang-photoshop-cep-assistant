@@ -44,8 +44,40 @@ var XinyangHostModuleLoader = (function () {
                 loaded.push(relative);
                 return true;
             } catch (error) {
-                failed.push(relative + "：" + String(error && error.message ? error.message : error));
-                throw error;
+                /*
+                 * Photoshop 27.x on some Windows locale/encoding combinations
+                 * can throw Error 44 ("Cannot convert") from $.evalFile before
+                 * the JSX source is evaluated. Read the file as UTF-8 and use
+                 * ExtendScript's evaluator as a compatibility fallback. Every
+                 * module registers its factory on $.global, so evaluating the
+                 * source in this loader scope does not leak private variables.
+                */
+                var firstMessage = String(error && error.message ? error.message : error);
+                var errorNumber = Number(error && (error.number !== undefined ? error.number : error.code));
+                var canUseCompatibilityFallback = /convert|转换/i.test(firstMessage) || errorNumber === 44 || errorNumber === -44;
+                if (!canUseCompatibilityFallback) {
+                    failed.push(relative + "：" + firstMessage);
+                    throw error;
+                }
+                var fallbackError = null;
+                var source = null;
+                try {
+                    file.encoding = "UTF-8";
+                    if (!file.open("r")) throw new Error("文件无法打开：" + file.fsName);
+                    source = file.read();
+                    file.close();
+                    if (!source) throw new Error("文件内容为空：" + file.fsName);
+                    eval(source);
+                    loadedMap[relative] = true;
+                    loaded.push(relative);
+                    return true;
+                } catch (compatibilityError) {
+                    fallbackError = compatibilityError;
+                    try { if (file.opened) file.close(); } catch (ignoreClose) {}
+                }
+                var fallbackMessage = String(fallbackError && fallbackError.message ? fallbackError.message : fallbackError);
+                failed.push(relative + "：" + firstMessage + "；UTF-8 回退：" + fallbackMessage);
+                throw new Error("宿主模块加载失败：" + relative + "（" + firstMessage + "；UTF-8 回退：" + fallbackMessage + "）");
             }
         }
 

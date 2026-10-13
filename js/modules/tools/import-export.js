@@ -129,6 +129,8 @@
           (result.smartObjects || 0) + " 个智能对象");
       }
       if (result.skipped) parts.push("跳过 " + result.skipped + " 项");
+      if (result.ungrouped) parts.push("取消编组 " + result.ungrouped + " 个单图层组");
+      if (result.errorSummary) parts.push("未完成项：" + result.errorSummary);
       return parts.join("；");
     }
 
@@ -175,7 +177,7 @@
         var index = 0;
         var succeeded = 0;
         var failed = [];
-        var totals = { removed: 0, smartObjects: 0, documents: 0, skipped: 0 };
+        var totals = { removed: 0, smartObjects: 0, documents: 0, skipped: 0, ungrouped: 0 };
 
         function next() {
           if (index >= files.length) {
@@ -183,6 +185,7 @@
               "，删除 " + totals.removed + " 项，优化 " + totals.smartObjects +
               " 个智能对象";
             if (totals.skipped) message += "，跳过 " + totals.skipped + " 项";
+            if (totals.ungrouped) message += "，取消编组 " + totals.ungrouped + " 个单图层组";
             if (failed.length) message += "；失败 " + failed.length + " 个";
             status(message);
             return Promise.resolve({ succeeded: succeeded, failed: failed });
@@ -200,6 +203,7 @@
             totals.smartObjects += Number(result.smartObjects) || 0;
             totals.documents += Number(result.documents) || 0;
             totals.skipped += Number(result.skipped) || 0;
+            totals.ungrouped += Number(result.ungrouped) || 0;
           }).catch(function (error) {
             failed.push(slimFileName(filePath) + "：" + humanError(error));
           }).then(next);

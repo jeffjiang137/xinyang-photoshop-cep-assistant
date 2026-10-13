@@ -13,6 +13,7 @@ XinyangHostModules.layerTools = function (deps) {
     var activeLayerId = deps.activeLayerId;
     var selectedLayerIds = deps.selectedLayerIds;
     var selectLayersByIds = deps.selectLayersByIds;
+    var toolLayersByIdsWithoutSelection = deps.toolLayersByIdsWithoutSelection;
     var layerNumericId = deps.layerNumericId;
     var suspendToolsHistory = deps.suspendToolsHistory;
     var toolArrayContains = deps.toolArrayContains;
@@ -533,8 +534,10 @@ XinyangHostModules.layerTools = function (deps) {
 
     function toolLayerSignature(document, layer, criteria) {
         var id = toolLayerId(document, layer);
-        var size;
-        try { size = layerSize(layer); } catch (ignoreSize) { size = { width: 0, height: 0 }; }
+        var size = { width: 0, height: 0 };
+        if (toolArrayContains(criteria, "size")) {
+            try { size = layerSize(layer); } catch (ignoreSize) {}
+        }
         var signature = {
             id: id,
             name: String(layer.name || ""),
@@ -899,6 +902,51 @@ XinyangHostModules.layerTools = function (deps) {
         });
     }
 
+    // A clipping stack is one visible object. Its base determines alignment;
+    // every clipped member follows the base so its crop remains unchanged.
+    function toolAlignmentBase(layer) {
+        if (!toolLayerGroupedState(layer)) return layer;
+        var siblings = layer.parent.layers;
+        var found = false;
+        for (var i = 0; i < siblings.length; i += 1) {
+            if (Number(siblings[i].id) === Number(layer.id)) found = true;
+            if (found && !toolLayerGroupedState(siblings[i])) return siblings[i];
+        }
+        throw new Error("无法读取剪贴蒙版的底层矩形");
+    }
+
+    function toolAlignmentMembers(base) {
+        var siblings = base.parent.layers;
+        var members = [base];
+        for (var i = 0; i < siblings.length; i += 1) {
+            if (Number(siblings[i].id) !== Number(base.id)) continue;
+            for (var j = i - 1; j >= 0 && toolLayerGroupedState(siblings[j]); j -= 1) {
+                members.push(siblings[j]);
+            }
+            break;
+        }
+        return members;
+    }
+
+    function toolAlignmentBounds(layer) {
+        if (layer.typename !== "LayerSet") return layerSize(layer);
+        var left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
+        for (var i = 0; i < layer.layers.length; i += 1) {
+            var child = layer.layers[i];
+            if (!child.visible || toolLayerGroupedState(child)) continue;
+            var box = toolAlignmentBounds(child);
+            if (!(box.width > 0 && box.height > 0)) continue;
+            left = Math.min(left, box.left); top = Math.min(top, box.top);
+            right = Math.max(right, box.left + box.width); bottom = Math.max(bottom, box.top + box.height);
+        }
+        if (!isFinite(left)) return layerSize(layer);
+        // Respect any mask applied to the enclosing group as well.
+        var outer = layerSize(layer);
+        left = Math.max(left, outer.left); top = Math.max(top, outer.top);
+        right = Math.min(right, outer.left + outer.width); bottom = Math.min(bottom, outer.top + outer.height);
+        return { left: left, top: top, width: Math.max(0, right-left), height: Math.max(0, bottom-top) };
+    }
+
     function toolsAlignLayers(options) {
         if (!app.documents.length) throw new Error("请先打开文档并选择多个图层");
         var document = app.activeDocument;
@@ -906,13 +954,36 @@ XinyangHostModules.layerTools = function (deps) {
         if (ids.length < 2) throw new Error("图层对齐至少需要选择两个图层");
         var action = String(options && options.action || "left");
         if (!/^(left|hCenter|right|top|vCenter|bottom)$/.test(action)) throw new Error("未知对齐方式");
+        if (deps.tryAlignTextLayers) {
+            var textResult = deps.tryAlignTextLayers(document, ids, action);
+            if (textResult) return textResult;
+        }
+        var selected = toolLayersByIdsWithoutSelection(document, ids);
         var layers = [];
+        var memberSets = [];
+        var seen = {};
         var bounds = [];
         var minLeft = Infinity, minTop = Infinity, maxRight = -Infinity, maxBottom = -Infinity;
         var index;
         for (index = 0; index < ids.length; index += 1) {
-            var layer = toolLayerById(document, ids[index]);
-            var size = layerSize(layer);
+            var layer = selected[index];
+            if (!layer) throw new Error("无法读取当前选中的图层");
+            var nested = false;
+            for (var ancestorIndex = 0; ancestorIndex < selected.length; ancestorIndex += 1) {
+                if (selected[ancestorIndex] && toolLayerIsDescendantOf(layer, selected[ancestorIndex])) nested = true;
+            }
+            if (nested) continue;
+            layer = toolAlignmentBase(layer);
+            if (seen["id_" + layer.id]) continue;
+            seen["id_" + layer.id] = true;
+            var members = toolAlignmentMembers(layer);
+            for (var memberIndex = 0; memberIndex < members.length; memberIndex += 1) {
+                if (members[memberIndex].allLocked || members[memberIndex].positionLocked) {
+                    throw new Error("请先解锁需要对齐的图层及其剪贴图片");
+                }
+            }
+            memberSets.push(members);
+            var size = toolAlignmentBounds(layer);
             layers.push(layer);
             bounds.push(size);
             minLeft = Math.min(minLeft, size.left);
@@ -933,49 +1004,15 @@ XinyangHostModules.layerTools = function (deps) {
                 else if (action === "top") dy = minTop - box.top;
                 else if (action === "vCenter") dy = centerY - (box.top + box.height / 2);
                 else if (action === "bottom") dy = maxBottom - (box.top + box.height);
-                layers[index].translate(UnitValue(dx, "px"), UnitValue(dy, "px"));
+                if (Math.abs(dx) > 0.01 || Math.abs(dy) > 0.01) {
+                    var members = memberSets[index];
+                    for (var memberIndex = 0; memberIndex < members.length; memberIndex += 1) {
+                        members[memberIndex].translate(UnitValue(dx, "px"), UnitValue(dy, "px"));
+                    }
+                }
                 processed += 1;
             }
-            selectLayersByIds(ids);
             return { processed: processed, action: action };
-        });
-    }
-
-    function toolsCenterLayersOnCanvas(options) {
-        if (!app.documents.length) throw new Error("请先打开文档并选择图层");
-        var document = app.activeDocument;
-        var ids = selectedLayerIds();
-        if (!ids.length) throw new Error("请先选择需要基于画布居中的图层");
-        var axis = String(options && options.axis || "horizontal") === "vertical" ? "vertical" : "horizontal";
-        var layers = [];
-        var minLeft = Infinity, minTop = Infinity, maxRight = -Infinity, maxBottom = -Infinity;
-        var index;
-        for (index = 0; index < ids.length; index += 1) {
-            var layer = toolLayerById(document, ids[index]);
-            var size = layerSize(layer);
-            layers.push(layer);
-            minLeft = Math.min(minLeft, size.left);
-            minTop = Math.min(minTop, size.top);
-            maxRight = Math.max(maxRight, size.left + size.width);
-            maxBottom = Math.max(maxBottom, size.top + size.height);
-        }
-        var canvasCenterX = pixels(document.width) / 2;
-        var canvasCenterY = pixels(document.height) / 2;
-        var selectionCenterX = (minLeft + maxRight) / 2;
-        var selectionCenterY = (minTop + maxBottom) / 2;
-        var dx = axis === "horizontal" ? canvasCenterX - selectionCenterX : 0;
-        var dy = axis === "vertical" ? canvasCenterY - selectionCenterY : 0;
-        return suspendToolsHistory(document, axis === "vertical" ? "鑫洋助理：基于画布垂直居中" : "鑫洋助理：基于画布水平居中", function () {
-            var processed = 0;
-            for (index = 0; index < layers.length; index += 1) {
-                try {
-                    layers[index].translate(UnitValue(dx, "px"), UnitValue(dy, "px"));
-                    processed += 1;
-                } catch (ignoreCanvasCenterLayer) {}
-            }
-            if (!processed) throw new Error("当前选择中没有可移动的图层");
-            selectLayersByIds(ids);
-            return { processed: processed, axis: axis, offsetX: dx, offsetY: dy };
         });
     }
 
@@ -1214,55 +1251,6 @@ XinyangHostModules.layerTools = function (deps) {
         set.putReference(charIDToTypeID("null"), reference);
         set.putObject(charIDToTypeID("T   "), stringIDToTypeID("pathClass"), toolPlainToDescriptor(values));
         executeAction(charIDToTypeID("setd"), set, DialogModes.NO);
-    }
-
-    function toolsApplySmartSnap(options) {
-        if (!app.documents.length) throw new Error("请先打开文档并选择要吸附的图层");
-        var document = app.activeDocument;
-        var ids = selectedLayerIds();
-        if (!ids.length) throw new Error("请先选择要吸附的图层");
-        var distance = Math.max(1, Math.min(200, Number(options && options.distance) || 20));
-        var selected = [], index, layer;
-        for (index = 0; index < ids.length; index += 1) selected.push(toolLayerById(document, ids[index]));
-        function boxOf(layers) {
-            var result = { left: Infinity, top: Infinity, right: -Infinity, bottom: -Infinity }, i, b;
-            for (i = 0; i < layers.length; i += 1) { b = layers[i].bounds; result.left = Math.min(result.left, pixels(b[0])); result.top = Math.min(result.top, pixels(b[1])); result.right = Math.max(result.right, pixels(b[2])); result.bottom = Math.max(result.bottom, pixels(b[3])); }
-            return result;
-        }
-        var moving = boxOf(selected);
-        function containsLayer(list, item) { var i; for (i = 0; i < list.length; i += 1) if (list[i] === item) return true; return false; }
-        var candidates = [];
-        function collect(layers) { var i, item; for (i = 0; i < layers.length; i += 1) { item = layers[i]; if (!item.visible || item.allLocked || containsLayer(selected, item)) continue; candidates.push(item); if (item.typename === "LayerSet") collect(item.layers); } }
-        collect(document.layers);
-        var bestX = null, bestY = null;
-        function consider(axis, delta, label) {
-            if (Math.abs(delta) > distance) return;
-            var current = axis === "x" ? bestX : bestY;
-            if (!current || Math.abs(delta) < Math.abs(current.delta)) { if (axis === "x") bestX = { delta: delta, label: label }; else bestY = { delta: delta, label: label }; }
-        }
-        function compareBox(target, label) {
-            if (options.layerEdges) { consider("x", target.left - moving.left, label + "左边缘"); consider("x", target.right - moving.right, label + "右边缘"); consider("x", target.left - moving.right, label + "左边缘"); consider("x", target.right - moving.left, label + "右边缘"); consider("y", target.top - moving.top, label + "上边缘"); consider("y", target.bottom - moving.bottom, label + "下边缘"); consider("y", target.top - moving.bottom, label + "上边缘"); consider("y", target.bottom - moving.top, label + "下边缘"); }
-            if (options.centers) { consider("x", (target.left + target.right - moving.left - moving.right) / 2, label + "水平中心"); consider("y", (target.top + target.bottom - moving.top - moving.bottom) / 2, label + "垂直中心"); }
-        }
-        for (index = 0; index < candidates.length; index += 1) compareBox(boxOf([candidates[index]]), "图层");
-        var canvas = { left: 0, top: 0, right: pixels(document.width), bottom: pixels(document.height) };
-        if (options.canvasEdges) compareBox(canvas, "画布");
-        if (options.guides) {
-            for (index = 0; index < document.guides.length; index += 1) {
-                var guide = document.guides[index], coordinate = pixels(guide.coordinate);
-                if (guide.direction === Direction.VERTICAL) { consider("x", coordinate - moving.left, "垂直参考线"); consider("x", coordinate - moving.right, "垂直参考线"); if (options.centers) consider("x", coordinate - (moving.left + moving.right) / 2, "垂直参考线中心"); }
-                else { consider("y", coordinate - moving.top, "水平参考线"); consider("y", coordinate - moving.bottom, "水平参考线"); if (options.centers) consider("y", coordinate - (moving.top + moving.bottom) / 2, "水平参考线中心"); }
-            }
-        }
-        if (options.equalSpacing && candidates.length >= 2) {
-            var leftNeighbor = null, rightNeighbor = null, topNeighbor = null, bottomNeighbor = null, candidateBox;
-            for (index = 0; index < candidates.length; index += 1) { candidateBox = boxOf([candidates[index]]); if (candidateBox.right <= moving.left && (!leftNeighbor || candidateBox.right > leftNeighbor.right)) leftNeighbor = candidateBox; if (candidateBox.left >= moving.right && (!rightNeighbor || candidateBox.left < rightNeighbor.left)) rightNeighbor = candidateBox; if (candidateBox.bottom <= moving.top && (!topNeighbor || candidateBox.bottom > topNeighbor.bottom)) topNeighbor = candidateBox; if (candidateBox.top >= moving.bottom && (!bottomNeighbor || candidateBox.top < bottomNeighbor.top)) bottomNeighbor = candidateBox; }
-            if (leftNeighbor && rightNeighbor) consider("x", (leftNeighbor.right + rightNeighbor.left - (moving.right - moving.left)) / 2 - moving.left, "水平等距");
-            if (topNeighbor && bottomNeighbor) consider("y", (topNeighbor.bottom + bottomNeighbor.top - (moving.bottom - moving.top)) / 2 - moving.top, "垂直等距");
-        }
-        var dx = bestX ? bestX.delta : 0, dy = bestY ? bestY.delta : 0;
-        if (!bestX && !bestY) return { processed: 0, xTarget: "未找到水平目标", yTarget: "未找到垂直目标" };
-        return suspendToolsHistory(document, "鑫洋助理：磁吸模式", function () { for (index = 0; index < selected.length; index += 1) selected[index].translate(UnitValue(dx, "px"), UnitValue(dy, "px")); selectLayersByIds(ids); return { processed: selected.length, offsetX: dx, offsetY: dy, xTarget: bestX ? bestX.label : "未命中水平目标", yTarget: bestY ? bestY.label : "未命中垂直目标" }; });
     }
 
     function toolsSnapShapeAnchors(options) {
@@ -1675,7 +1663,6 @@ XinyangHostModules.layerTools = function (deps) {
         toolsSmartObject: toolsSmartObject,
         toolsScaleLayers: toolsScaleLayers,
         toolsAlignLayers: toolsAlignLayers,
-        toolsCenterLayersOnCanvas: toolsCenterLayersOnCanvas,
         toolsDistributeLayersEvenly: toolsDistributeLayersEvenly,
         toolSetColorOverlay: toolSetColorOverlay,
         toolFillNormalLayerPixels: toolFillNormalLayerPixels,
@@ -1686,7 +1673,6 @@ XinyangHostModules.layerTools = function (deps) {
         toolSnapPointDimension: toolSnapPointDimension,
         toolGetVectorMaskPathPlain: toolGetVectorMaskPathPlain,
         toolSetVectorMaskPathPlain: toolSetVectorMaskPathPlain,
-        toolsApplySmartSnap: toolsApplySmartSnap,
         toolsSnapShapeAnchors: toolsSnapShapeAnchors,
         toolShapeAppearanceInfo: toolShapeAppearanceInfo,
         toolPutNativeStrokeDefaults: toolPutNativeStrokeDefaults,
