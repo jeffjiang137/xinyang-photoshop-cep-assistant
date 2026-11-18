@@ -37,13 +37,6 @@
         var hintWidth = Math.max(0, Number(hint.width) || 0);
         var hintHeight = Math.max(0, Number(hint.height) || 0);
         if (!(hintWidth > 2 && hintHeight > 2)) continue;
-        if (
-          hintWidth >= width * 0.96 &&
-          hintHeight >= height * 0.68
-        ) {
-          continue;
-        }
-        if (hintHeight >= height * 0.78) continue;
         hints.push({
           id: Number(hint.id),
           name: String(hint.name || ""),
@@ -68,6 +61,29 @@
       var structuralCandidates = [];
       for (index = 0; index < hints.length; index += 1) {
         var current = hints[index];
+        var sectionTitle = current.kind === "text" &&
+          /参数|场景|案例|流程|资质|证书|须知|介绍|展示|优势|工厂|详情/.test(current.name) &&
+          current.height <= width * 0.18;
+        if (sectionTitle) {
+          structuralCandidates.push({
+            y: Math.max(0, current.top - Math.max(12, width * 0.025) - 2),
+            score: 680, priority: 5.5, source: "section-heading"
+          });
+        }
+
+        var coverage = Math.max(0, Math.min(width, current.left + current.width) - current.left) / width;
+        var background = /背景|background|\bbg\b/i.test(current.name);
+        var visual = current.kind === "shape" || current.kind === "image";
+        var rank = background ? 9 : coverage >= 0.96 && visual
+          ? (current.kind === "shape" ? 8 : 7)
+          : coverage >= 0.80 && visual ? 6 : 0;
+        if (rank) {
+          [current.top, current.bottom].forEach(function (edge) {
+            structuralCandidates.push({y: edge, score: 600 + coverage * 100,
+              priority: rank, source: "layer-edge"});
+          });
+        }
+        if (!background && current.kind !== "shape" && current.kind !== "group" && current.height < height * 0.78) {
         protectedRanges.push({
           top: current.top,
           bottom: current.bottom,
@@ -77,6 +93,7 @@
             ? Math.max(12, width * 0.035)
             : Math.max(6, width * 0.014)
         });
+        }
         if (
           current.atomic ||
           (
@@ -86,6 +103,12 @@
             current.height >= width * 0.22
           )
         ) {
+          structuralCandidates.push({
+            y: current.top,
+            score: current.atomic ? 180 : 105,
+            priority: 2,
+            source: "layer"
+          });
           structuralCandidates.push({
             y: current.bottom,
             score: current.atomic ? 180 : 105,
@@ -104,6 +127,7 @@
         var title = hints[index];
         if (
           title.kind !== "text" ||
+          !/标题|heading|title/i.test(title.name) ||
           title.height > width * 0.32
         ) {
           continue;
@@ -116,6 +140,9 @@
           nextIndex += 1
         ) {
           var candidate = hints[nextIndex];
+          if (candidate.kind === "group" || /背景|background/i.test(candidate.name)) continue;
+          if (isFinite(title.parentId) && isFinite(candidate.parentId) &&
+              title.parentId !== candidate.parentId) continue;
           if (candidate.top < title.bottom - 2) continue;
           var gap = candidate.top - title.bottom;
           if (gap > width * 0.24) break;
@@ -159,6 +186,8 @@
         var visual = hints[index];
         if (
           visual.kind === "text" ||
+          visual.kind === "group" || visual.kind === "shape" ||
+          /背景|background/i.test(visual.name) ||
           visual.height < width * 0.16 ||
           visual.width < width * 0.12
         ) {
@@ -178,6 +207,7 @@
             continue;
           }
           var controlName = String(control.name || "");
+          if (/流程|须知|参数|资质|证书|场景|案例|展示|介绍/.test(controlName)) continue;
           var namedButton = /按钮|下单|订购|购买|查看|咨询|立即|button|btn|order|buy/i.test(
             controlName
           );
@@ -239,6 +269,14 @@
       var index;
       for (index = 0; index < ranges.length; index += 1) {
         var range = ranges[index];
+        // Structural edges are exact PSD coordinates, not inferred pixel activity.
+        // Keep text/association protection and reject cuts inside other photographs.
+        if (candidate && (candidate.source === "layer-edge" || candidate.source === "section-heading")) {
+          if (range.type === "pixel" || range.inferredFromPixels) continue;
+          if (range.type === "layer" &&
+              (Math.abs(y - range.top) <= 3 || Math.abs(y - range.bottom) <= 3)) continue;
+        }
+
         /*
          * 真正贯穿画布的整行分割线本身会被像素活动检测标记。它可以
          * 穿过普通像素活动范围，但仍必须服从文字、标题关联、按钮关联
@@ -293,7 +331,7 @@
        * 一级贯穿带或二级 PSD 板块边界附近，不再保留低等级候选。
        * 这样产品卡内部的小留白不会与真正的整屏分割带同时生成参考线。
        */
-      var influenceDistance = Math.max(80, width * 0.68);
+      var influenceDistance = 1;
       filtered = filtered.filter(function (candidate, candidateIndex) {
         var priority = Number(candidate.priority) || 0;
         var strongerIndex;
@@ -401,7 +439,8 @@
       meta,
       rowDetail,
       ranges,
-      rowSafe
+      rowSafe,
+      candidates
     ) {
       // Smart-slice boundaries must remain visibly separated. Keep this in sync
       // with the Photoshop-side guard, which is the final authority before guides
@@ -413,21 +452,24 @@
       var previewHeight = rowDetail && rowDetail.length
         ? rowDetail.length
         : 0;
-      var low = Math.max(
-        start + minimumGap,
-        end - remainingPieces * maximumGap
-      );
+      var low = start + minimumGap;
       var high = Math.min(
         start + maximumGap,
         end - remainingPieces * minimumGap
       );
       if (high < low) {
-        return Math.round(Math.max(
-          start + minimumGap,
-          Math.min(end - minimumGap, preferred)
-        ));
+        return 0;
       }
       preferred = Math.max(low, Math.min(high, preferred));
+      var ranked = (candidates || []).filter(function (candidate) {
+        return candidate.y >= low && candidate.y <= high &&
+          !smartSliceCutProtected(candidate.y, ranges, width, candidate);
+      }).sort(function (left, right) {
+        return (Number(right.priority) || 0) - (Number(left.priority) || 0) ||
+          Math.abs(left.y - preferred) - Math.abs(right.y - preferred) ||
+          (Number(right.score) || 0) - (Number(left.score) || 0);
+      });
+      if (ranked.length) return Math.round(ranked[0].y);
       if (!previewHeight) return Math.round(preferred);
 
       var lowPreview = Math.max(
@@ -441,7 +483,7 @@
       var bestY = 0;
       var bestScore = Infinity;
       var pass;
-      for (pass = 0; pass < 2; pass += 1) {
+      for (pass = 0; pass < 3; pass += 1) {
         var previewY;
         for (
           previewY = lowPreview;
@@ -450,10 +492,11 @@
         ) {
           if (pass === 0 && rowSafe && !rowSafe[previewY]) continue;
           var y = previewY * height / previewHeight;
-          if (smartSliceCutProtected(y, ranges, width)) continue;
+          if (pass < 2 && smartSliceCutProtected(y, ranges, width)) continue;
           var detail = Number(rowDetail[previewY]);
           if (!isFinite(detail)) detail = 0;
           var score = detail +
+            (smartSliceCutProtected(y, ranges, width) ? 1000 : 0) +
             Math.abs(y - preferred) / Math.max(1, width) * 8;
           if (score < bestScore) {
             bestScore = score;
@@ -470,7 +513,8 @@
       meta,
       rowDetail,
       ranges,
-      rowSafe
+      rowSafe,
+      candidates
     ) {
       // Includes the canvas top/bottom edges so the first and last slices also
       // cannot become narrow slivers.
@@ -505,34 +549,13 @@
         var segmentStart = output[output.length - 1];
         var segmentEnd = compact[index];
         var span = segmentEnd - segmentStart;
-        if (span > maximumGap) {
-          var pieces = Math.ceil(span / maximumGap);
-          var pieceIndex;
-          for (pieceIndex = 1; pieceIndex < pieces; pieceIndex += 1) {
-            var remainingPieces = pieces - pieceIndex;
-            var ideal = segmentStart + span * pieceIndex / pieces;
-            var cut = smartSliceFindHardLimitCut(
-              output[output.length - 1],
-              segmentEnd,
-              ideal,
-              remainingPieces,
-              meta,
-              rowDetail,
-              ranges,
-              rowSafe
-            );
-            cut = Math.max(
-              output[output.length - 1] + minimumGap,
-              Math.min(
-                segmentEnd - remainingPieces * minimumGap,
-                cut
-              )
-            );
-            if (cut - output[output.length - 1] > maximumGap) {
-              cut = output[output.length - 1] + maximumGap;
-            }
-            output.push(Math.round(cut));
-          }
+        while (segmentEnd - output[output.length - 1] > maximumGap) {
+          var last = output[output.length - 1];
+          var cut = smartSliceFindHardLimitCut(last, segmentEnd,
+            Math.min(last + maximumGap, segmentEnd - minimumGap),
+            1, meta, rowDetail, ranges, rowSafe, candidates);
+          if (!cut || cut <= last) cut = Math.min(last + maximumGap, segmentEnd - minimumGap);
+          output.push(Math.round(cut));
         }
         if (segmentEnd > output[output.length - 1]) output.push(segmentEnd);
       }
@@ -547,109 +570,53 @@
       rowSafe
     ) {
       var width = Math.max(1, Number(meta.width) || 1);
-      var height = Math.max(2, Number(meta.height) || 2);
-      var minimum = Math.max(220, width * 0.48);
-      var preferred = Math.min(2500, Math.max(620, width * 1.55));
-      var maximum = Math.min(2500, Math.max(980, width * 2.65));
-      var merged = smartSliceMergeCandidates(
-        candidates,
-        width,
-        height,
-        ranges
-      );
-      var selected = [0];
-      var cursor = 0;
-
-      /*
-       * 相距不足一个最小板块高度的候选视为同一区域，只保留更可靠
-       * 的切口，避免正文行距或卡片内部留白生成过多小切片。
-       */
-      while (cursor < merged.length) {
-        var best = merged[cursor];
-        var clusterStartY = merged[cursor].y;
-        var clusterEnd = cursor + 1;
-        while (
-          clusterEnd < merged.length &&
-          merged[clusterEnd].y - clusterStartY < minimum
-        ) {
-          var clusterPriority =
-            Number(merged[clusterEnd].priority) || 0;
-          var bestPriority = Number(best.priority) || 0;
-          if (
-            clusterPriority > bestPriority ||
-            (
-              clusterPriority === bestPriority &&
-              merged[clusterEnd].score > best.score
-            )
-          ) {
-            best = merged[clusterEnd];
-          }
-          clusterEnd += 1;
-        }
-        if (best.y - selected[selected.length - 1] >= minimum) {
-          selected.push(Math.round(best.y));
-        }
-        cursor = clusterEnd;
+      var height = Math.max(1, Math.round(Number(meta.height) || 1));
+      if (height < 200) return [0, height];
+      var points = {};
+      function add(y, reward) {
+        y = Math.round(y);
+        if (y < 200 || y > height - 200) return;
+        if (!points[y] || reward > points[y].reward) points[y] = {y: y, reward: reward};
       }
-
-      var expanded = [0];
-      var selectedIndex;
-      for (
-        selectedIndex = 1;
-        selectedIndex <= selected.length;
-        selectedIndex += 1
-      ) {
-        var nextBoundary = selectedIndex < selected.length
-          ? selected[selectedIndex]
-          : height;
-        var last = expanded[expanded.length - 1];
-        while (nextBoundary - last > maximum) {
-          var desired = Math.min(
-            nextBoundary - minimum,
-            last + preferred
-          );
-          var inserted = smartSliceFallbackCut(
-            last,
-            nextBoundary,
-            desired,
-            meta,
-            rowDetail,
-            ranges,
-            rowSafe
-          );
-          if (!inserted || inserted - last < minimum * 0.72) break;
-          expanded.push(inserted);
-          last = inserted;
-        }
-        if (nextBoundary > last) expanded.push(nextBoundary);
+      smartSliceMergeCandidates(candidates, width, height, ranges).forEach(function (item) {
+        // Every cut has a cost: a high-ranked edge is preferred, not mandatory.
+        add(item.y, -60000 + Math.pow(2, Number(item.priority) || 0) * 100 +
+          Math.min(99, (Number(item.score) || 0) / 10));
+      });
+      // Bounded fallback grid guarantees a feasible path even for a flattened poster.
+      // Expensive fallback cuts are used only when semantic edges cannot satisfy 2500px.
+      for (var y = 200; y <= height - 200; y += 50) {
+        var row = rowDetail && rowDetail.length
+          ? Math.min(rowDetail.length - 1, Math.round(y * rowDetail.length / height)) : 0;
+        var protectedCut = smartSliceCutProtected(y, ranges, width);
+        var quiet = rowSafe && rowSafe[row];
+        add(y, -100000 - (protectedCut ? 1000000 : 0) -
+          (quiet ? 0 : 10000) - Math.max(0, Number(rowDetail && rowDetail[row]) || 0));
       }
-
-      if (
-        expanded.length > 2 &&
-        height - expanded[expanded.length - 2] < width * 0.22
-      ) {
-        expanded.splice(expanded.length - 2, 1);
-      }
-
-      var output = [];
-      for (selectedIndex = 0; selectedIndex < expanded.length; selectedIndex += 1) {
-        var value = Math.max(
-          0,
-          Math.min(height, Math.round(expanded[selectedIndex]))
-        );
-        if (!output.length || value > output[output.length - 1]) {
-          output.push(value);
+      var nodes = Object.keys(points).map(function (key) { return points[key]; });
+      nodes.push({y: 0, reward: 0}, {y: height, reward: 0});
+      nodes.sort(function (left, right) { return left.y - right.y; });
+      var scores = [], previous = [], i, j;
+      scores[0] = 0;
+      for (i = 1; i < nodes.length; i += 1) {
+        scores[i] = -Infinity;
+        for (j = i - 1; j >= 0; j -= 1) {
+          var gap = nodes[i].y - nodes[j].y;
+          if (gap > 2500) break;
+          if (gap < 200 || scores[j] === -Infinity) continue;
+          var preferredMinimum = Math.min(1100, Math.max(600, width));
+          var shortfall = Math.max(0, preferredMinimum - gap) / preferredMinimum;
+          var score = scores[j] + nodes[i].reward - 80000 * shortfall * shortfall;
+          if (score > scores[i]) { scores[i] = score; previous[i] = j; }
         }
       }
-      if (!output.length || output[0] !== 0) output.unshift(0);
-      if (output[output.length - 1] !== height) output.push(height);
-      return enforceSmartSliceBoundarySpacing(
-        output,
-        meta,
-        rowDetail,
-        ranges,
-        rowSafe
-      );
+      var result = [], cursor = nodes.length - 1;
+      if (scores[cursor] === -Infinity) throw new Error("无法满足切片间距约束");
+      while (cursor !== undefined) {
+        result.unshift(nodes[cursor].y);
+        cursor = previous[cursor];
+      }
+      return result;
     }
 
     function analyzeSmartSliceImage(imageBase64, meta) {
@@ -1069,6 +1036,7 @@
                   ),
                   strength: 4,
                   type: "association",
+                  inferredFromPixels: true,
                   paddingTop: Math.max(2, originalWidth * 0.006),
                   paddingBottom: Math.max(3, originalWidth * 0.01)
                 });
@@ -1081,6 +1049,7 @@
                   bottom: activeBottomOriginal,
                   strength: 4,
                   type: "association",
+                  inferredFromPixels: true,
                   paddingTop: Math.max(3, originalWidth * 0.01),
                   paddingBottom: Math.max(2, originalWidth * 0.006)
                 });
@@ -1194,7 +1163,7 @@
                     180,
                     rowVertical[transitionBest] * 2
                   ),
-                  priority: 4,
+                  priority: 5,
                   coverage: 1,
                   source: "full-width-transition"
                 });
@@ -1207,7 +1176,7 @@
              * 不再直接把图层 bottom 当成切口，避免图层边界贴着文字
              * 或图片时产生“切字”。
              */
-            var snapRadius = originalWidth * 0.22;
+            var snapRadius = Math.min(100, originalWidth * 0.10);
             var structuralIndex;
             for (
               structuralIndex = 0;
@@ -1249,6 +1218,10 @@
               }
             }
 
+            // Exact structural edges outrank pixel whitespace; foreground protection still applies.
+            candidates = candidates.concat(layerData.structuralCandidates.filter(function (item) {
+              return item.source === "layer-edge" || item.source === "section-heading";
+            }));
             var boundaries = smartSliceChooseBoundaries(
               meta,
               candidates,

@@ -1,0 +1,42 @@
+const vm = require('vm');
+const fs = require('fs');
+const assert = require('assert');
+const EventEmitter = require('events');
+const nodes = {'cutout-url':{value:'http://127.0.0.1:8868'}};
+let responseCode=200, responseBody=Buffer.from('89504e470d0a1a0a0000','hex'), sent;
+const http={request(options, callback){
+  const req=new EventEmitter(); req.setTimeout=()=>{};
+  req.end=body=>{sent={options,body};const res=new EventEmitter();res.statusCode=responseCode;callback(res);process.nextTick(()=>{res.emit('data',responseBody);res.emit('end');});};
+  req.destroy=e=>req.emit('error',e);return req;
+}};
+const window={require:name=>name==='http'?http:require(name)};
+vm.runInNewContext(fs.readFileSync('js/modules/cutout/panel.js','utf8'),{window,Buffer,URL,Promise,Date,localStorage:{setItem(){}},document:{readyState:'loading',addEventListener(){},getElementById:id=>nodes[id]}});
+(async()=>{
+ const client=window.XinyangCutout;
+ assert.doesNotThrow(()=>client.checkCapabilities({ok:true,modelAvailable:true},'fast'));
+ assert.throws(()=>client.checkCapabilities({ok:true},'high'),/版本不支持/);
+ assert.throws(()=>client.checkCapabilities({ok:true,modes:['normal','fast']},'high'),/版本不支持/);
+ assert.throws(()=>client.checkCapabilities({ok:true,modes:['high'],vitmatteAvailable:false},'high'),/模型未安装/);
+ assert.throws(()=>client.checkCapabilities({ok:true,modes:['high']},'high'),/模型未安装/);
+ assert.doesNotThrow(()=>client.checkCapabilities({ok:true,modes:['fast','high'],vitmatteAvailable:true},'high'));
+
+ const png=await client.request('/remove-background',Buffer.from('source'));
+ assert.equal(png.slice(0,8).toString('hex'),'89504e470d0a1a0a');
+ assert.equal(sent.options.path,'/remove-background');assert.equal(sent.options.method,'POST');
+ assert(sent.body.includes(Buffer.from('name="image"')));assert(sent.body.includes(Buffer.from('source')));
+ assert(!sent.body.includes(Buffer.from('name="mode"')));
+ await client.request('/remove-background',Buffer.from('source'),{mode:'fast'});
+ assert(sent.body.includes(Buffer.from('name="mode"\r\n\r\nfast')));
+ await client.request('/remove-background',Buffer.from('source'),{mode:'high'});
+ assert(sent.body.includes(Buffer.from('name="mode"\r\n\r\nhigh')));
+ await assert.rejects(client.request('/remove-background',Buffer.from('x'),{mode:'invalid'}),/模式无效/);
+ responseCode=503;responseBody=Buffer.from(JSON.stringify({error:'模型未安装'}));
+ await assert.rejects(client.request('/remove-background',Buffer.from('x')),/模型未安装/);
+ responseCode=429;responseBody=Buffer.from(JSON.stringify({error:'busy'}));
+ await assert.rejects(client.request('/remove-background',Buffer.from('x'),{mode:'high'}),/服务正忙/);
+ responseCode=200;responseBody=Buffer.from('not png');
+ await assert.rejects(client.request('/remove-background',Buffer.from('x')),/有效 PNG/);
+ nodes['cutout-url'].value='http://example.com:8868';
+ await assert.rejects(client.request('/health'),/本机 HTTP/);
+ console.log('PASS: multipart, binary PNG, service error, invalid output, loopback restriction');
+})().catch(e=>{console.error(e);process.exitCode=1;});

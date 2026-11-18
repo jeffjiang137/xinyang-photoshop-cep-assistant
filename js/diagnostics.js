@@ -1,13 +1,13 @@
-(function () {
+﻿(function () {
   "use strict";
 
   if (window.XinyangDiagnostics) return;
 
-  var VERSION = "2.3.20";
+  var VERSION = "2.3.72";
   var STORAGE_KEY = "xinyang.diagnostics.recent.v1";
-  var MAX_ENTRIES = 600;
-  var PERSIST_ENTRIES = 260;
-  var IMPORTANT_ENTRIES = 120;
+  var MAX_ENTRIES = 200;
+  var PERSIST_ENTRIES = 200;
+  var IMPORTANT_ENTRIES = 40;
   var entries = [];
   var importantEntries = [];
   var persistTimer = 0;
@@ -127,9 +127,10 @@
     var modules = activeReportModules();
     if (!modules.fs || !modules.path || !modules.os) return "";
     try {
-      var folder = modules.path.join(modules.os.tmpdir(), "XinyangAssistant");
+      var root = new CSInterface().getSystemPath(SystemPath.EXTENSION);
+      var folder = modules.path.join(root, "logs");
       if (!modules.fs.existsSync(folder)) modules.fs.mkdirSync(folder, { recursive: true });
-      activeReportPath = modules.path.join(folder, "active-debug-" + sessionId + ".json");
+      activeReportPath = modules.path.join(folder, "active-debug.json");
     } catch (error) { activeReportPath = ""; }
     return activeReportPath;
   }
@@ -155,7 +156,7 @@
     return sanitizeValue({
       reportFormat: "XinyangAssistant-ActiveDebugReport-v1",
       updatedAt: nowIso(),
-      expiresAfter: "Deleted on normal panel close; stale files are removed on next startup after 12 hours.",
+      retention: "Latest bounded sanitized snapshot; retained on panel close and overwritten on next session.",
       plugin: { version: VERSION, sessionId: sessionId, sessionStartedAt: sessionStartedAt },
       ui: { statusBar: (document.getElementById("status-text") || {}).textContent || "", visibility: document.visibilityState || "" },
       recentIssues: importantEntries.slice(-IMPORTANT_ENTRIES),
@@ -184,10 +185,7 @@
   function removeActiveReport() {
     if (activeReportTimer) window.clearTimeout(activeReportTimer);
     activeReportTimer = 0;
-    var modules = activeReportModules();
-    try {
-      if (activeReportPath && modules.fs && modules.fs.existsSync(activeReportPath)) modules.fs.unlinkSync(activeReportPath);
-    } catch (ignoreActiveReportRemove) {}
+    writeActiveReportNow();
   }
 
   function log(level, category, message, data) {
@@ -217,41 +215,6 @@
       error: error,
       context: context || null
     });
-  }
-
-  function loadPreviousEntries() {
-    try {
-      var raw = window.localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
-      var saved = JSON.parse(raw);
-      if (!saved || !Array.isArray(saved.entries)) return;
-      saved.entries.slice(-120).forEach(function (entry) {
-        entries.push({
-          time: entry.time || "",
-          level: entry.level || "info",
-          category: "previous:" + (entry.category || "general"),
-          message: sanitizeString(entry.message || ""),
-          data: sanitizeValue(entry.data)
-        });
-      });
-      var previousImportant = Array.isArray(saved.importantEntries)
-        ? saved.importantEntries
-        : saved.entries.filter(function (entry) {
-            return entry && (entry.level === "error" || entry.level === "warning");
-          });
-      previousImportant.slice(-IMPORTANT_ENTRIES).forEach(function (entry) {
-        importantEntries.push({
-          time: entry.time || "",
-          level: entry.level || "warning",
-          category: "previous:" + String(entry.category || "general").replace(/^previous:/, ""),
-          message: sanitizeString(entry.message || ""),
-          data: sanitizeValue(entry.data)
-        });
-      });
-      if (importantEntries.length > IMPORTANT_ENTRIES) {
-        importantEntries.splice(0, importantEntries.length - IMPORTANT_ENTRIES);
-      }
-    } catch (error) {}
   }
 
   function patchConsole() {
@@ -911,7 +874,8 @@
     updateDebugSummary();
   }
 
-  loadPreviousEntries();
+  // Each panel session starts fresh; never import historical errors.
+  try { window.localStorage.removeItem(STORAGE_KEY); } catch (ignoreOldLogs) {}
   patchConsole();
   bindGlobalErrors();
   bindRuntimeEvents();

@@ -29,7 +29,7 @@
 
    `%APPDATA%\Adobe\CEP\extensions\com.jeffjiang.ecommerce-design-assistant-cep`
 
-3. 如果 Photoshop 尚未允许未签名 CEP 扩展，请按 Adobe CEP 的调试扩展文档设置 `PlayerDebugMode`。
+3. 如果提示“未正确签名”，先退出 Photoshop，再双击 [`scripts/cep-signature-repair/Repair.cmd`](scripts/cep-signature-repair/Repair.cmd)。工具为当前用户设置 CEP 6–12 及已有 CSXS 版本的 `PlayerDebugMode`，自动备份并检查结果；无需管理员身份。此设置允许当前用户加载未签名 CEP 扩展，也影响其他 Adobe CEP 插件。检查与恢复方法见同目录的[使用说明](scripts/cep-signature-repair/使用说明.txt)。
 4. 完全退出并重新打开 Photoshop，在“窗口 → 扩展（旧版）”中打开“鑫洋助理”。
 
 更新时建议先关闭 Photoshop，再覆盖扩展目录；插件保存的用户配置和服务密钥位于扩展目录之外，不会随仓库同步。

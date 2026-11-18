@@ -36,15 +36,24 @@ XinyangHostModules.coreLayers = function (deps) {
         return document.activeLayer;
     }
 
-    function toolLayersByIdsWithoutSelection(document, ids) {
+    function toolLayersByIdsWithoutSelection(document, ids, knownDocumentKey) {
         var documentKey;
         var wanted = {};
         var found = {};
         var output = [];
         var index;
 
+        // The usual property-edit target is already active. Avoid walking a
+        // large PSD merely to rediscover that layer, without changing selection.
+        if (ids.length === 1) {
+            try {
+                var active = document.activeLayer;
+                if (active && Number(active.id) === Number(ids[0])) return [active];
+            } catch (ignoreActiveLookup) {}
+        }
+
         try {
-            documentKey = currentDocumentId();
+            documentKey = knownDocumentKey !== undefined ? knownDocumentKey : currentDocumentId();
         } catch (ignoreLayerLookupDocumentId) {
             documentKey = document;
         }
@@ -70,17 +79,22 @@ XinyangHostModules.coreLayers = function (deps) {
             output = [];
         }
 
+        var remaining = 0;
         for (index = 0; index < ids.length; index += 1) {
+            if (!wanted["id_" + ids[index]]) remaining += 1;
             wanted["id_" + ids[index]] = true;
         }
         function walk(container) {
             var layerIndex;
-            for (layerIndex = 0; layerIndex < container.layers.length; layerIndex += 1) {
+            for (layerIndex = 0; remaining > 0 && layerIndex < container.layers.length; layerIndex += 1) {
                 var layer = container.layers[layerIndex];
                 var layerId = -1;
                 try { layerId = Number(layer.id); } catch (ignoreLayerId) {}
-                if (wanted["id_" + layerId]) found["id_" + layerId] = layer;
-                if (layer.typename === "LayerSet") walk(layer);
+                if (wanted["id_" + layerId] && !found["id_" + layerId]) {
+                    found["id_" + layerId] = layer;
+                    remaining -= 1;
+                }
+                if (remaining > 0 && layer.typename === "LayerSet") walk(layer);
             }
         }
         walk(document);
@@ -123,7 +137,7 @@ XinyangHostModules.coreLayers = function (deps) {
             cache.time = now;
             return cache.layers;
         }
-        var layers = toolLayersByIdsWithoutSelection(document, ids);
+        var layers = toolLayersByIdsWithoutSelection(document, ids, documentId);
         toolTextFormattingLayerCache = {
             documentId: documentId,
             key: key,

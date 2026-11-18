@@ -70,6 +70,7 @@ XinyangHostModules.browserExport = function (deps) {
                     continue;
                 }
                 var node = { id: descriptor.getInteger(stringIDToTypeID("layerID")),
+                    clipped: descriptor.hasKey(stringIDToTypeID("group")) && descriptor.getBoolean(stringIDToTypeID("group")),
                     visible: descriptor.getBoolean(stringIDToTypeID("visible")),
                     children: section === "layerSectionStart" ? [] : null };
                 current.push(node);
@@ -78,13 +79,36 @@ XinyangHostModules.browserExport = function (deps) {
             if (parents.length) throw new Error("图层组结构不完整");
             return tree;
         }
+        function includeClippingBases(layers, inherited) {
+            var any = false;
+            for (var i = 0; i < layers.length; i += 1) {
+                var node = layers[i];
+                node.keep = inherited;
+                for (var j = 0; j < ids.length; j += 1) {
+                    if (Number(node.id) === Number(ids[j])) node.keep = true;
+                }
+                node.whole = node.keep;
+                if (node.children && includeClippingBases(node.children, node.keep)) node.keep = true;
+            }
+            for (var k = 0; k < layers.length; k += 1) {
+                if (!layers[k].keep || !layers[k].clipped) continue;
+                var base = k + 1;
+                while (base < layers.length && layers[base].clipped) base += 1;
+                if (base >= layers.length) throw new Error("剪切蒙版缺少基底图层");
+                layers[base].keep = true;
+                layers[base].whole = true;
+                if (layers[base].children) includeClippingBases(layers[base].children, true);
+            }
+            for (var n = 0; n < layers.length; n += 1) if (layers[n].keep) any = true;
+            return any;
+        }
         function isolate(originalLayers, copiedLayers, inherited) {
             if (originalLayers.length !== copiedLayers.length) throw new Error("临时文档图层结构不一致");
             var any = false;
             for (var i = 0; i < originalLayers.length; i += 1) {
                 var original = originalLayers[i];
                 var cloned = copiedLayers[i];
-                var chosen = inherited;
+                var chosen = inherited || original.whole;
                 for (var j = 0; j < ids.length; j += 1) {
                     if (Number(original.id) === Number(ids[j])) chosen = true;
                 }
@@ -99,8 +123,9 @@ XinyangHostModules.browserExport = function (deps) {
         try {
             app.displayDialogs = DialogModes.NO;
             var layerTree = !bounds && ids.length && !selectedBackground ? captureLayers() : null;
+            if (layerTree) includeClippingBases(layerTree, false);
             stage = "复制临时文档";
-            copy = source.duplicate("浏览器临时图片", false);
+            copy = source.duplicate("浏览器临时图片", !!bounds || !ids.length);
             app.activeDocument = copy;
             stage = "隔离选中图层";
             if (selectedBackground) {
@@ -124,27 +149,14 @@ XinyangHostModules.browserExport = function (deps) {
             stage = "转换图片颜色";
             if (copy.mode !== DocumentMode.RGB) copy.changeMode(ChangeMode.RGB);
             if (copy.bitsPerChannel !== BitsPerChannelType.EIGHT) copy.bitsPerChannel = BitsPerChannelType.EIGHT;
-            stage = "导出 Web PNG";
-            var web = new ExportOptionsSaveForWeb();
-            web.format = SaveDocumentType.PNG;
-            web.PNG8 = false;
-            web.transparency = true;
-            web.interlaced = false;
-            web.includeProfile = false;
-            var exportMode = "web";
-            try {
-                copy.exportDocument(file, ExportType.SAVEFORWEB, web);
-            } catch (webError) {
-                /* Some Photoshop installations reject Save for Web. Native PNG
-                 * preserves the exact pixels and has no Save for Web size cap. */
-                stage = "兼容导出 PNG";
-                try { if (file.exists) file.remove(); } catch (ignorePartial) {}
-                var png = new PNGSaveOptions();
-                png.interlaced = false;
-                png.compression = 9;
-                copy.saveAs(file, png, true, Extension.LOWERCASE);
-                exportMode = "native";
-            }
+            stage = "快速导出 PNG";
+            /* Native PNG avoids Save for Web setup and a failed first export.
+             * Compression 6 balances encoding time and file size, losslessly. */
+            var png = new PNGSaveOptions();
+            png.interlaced = false;
+            png.compression = 6;
+            copy.saveAs(file, png, true, Extension.LOWERCASE);
+            var exportMode = "native-fast";
             if (!file.exists || file.length <= 0) throw new Error("图片文件未生成");
             return { tempPath: file.fsName, scope: bounds ? "selection" : ids.length ? "layers" : "canvas", format: "png", exportMode: exportMode };
         } catch (error) {

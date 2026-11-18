@@ -198,6 +198,17 @@ class TaskManager {
       if (assessment && assessment.emergency) task.warning = { code: RuntimeErrorCodes.PS_MEMORY_EMERGENCY, mode: 'DIAGNOSTIC_ONLY', at: new Date().toISOString() };
       return { sample, assessment, degraded: !!(assessment && assessment.degraded), policy: task.memoryPolicy };
     }
+    const command = task.command;
+    const recoveryCommand = command && command.action === task.operation &&
+      Number(task.documentId) > 0 && Number(command.documentId) === Number(task.documentId) &&
+      (task.operation === 'save_document' || task.operation === 'close_document_session');
+    if (recoveryCommand) {
+      const sample = await this.memoryGuard.sample();
+      const assessment = this.memoryGuard.snapshot().assessment;
+      task.memoryPolicy = { mode: 'RECOVERY_ONLY', checkpointRequired: false, skipLargeObjectCreation: true };
+      if (assessment && assessment.emergency) task.warning = { code: RuntimeErrorCodes.PS_MEMORY_EMERGENCY, mode: 'RECOVERY_ONLY', at: new Date().toISOString() };
+      return { sample, assessment, degraded: !!(assessment && assessment.degraded), policy: task.memoryPolicy };
+    }
     let admission;
     try {
       admission = await this.memoryGuard.gate({ heavy: task.kind === 'heavy' });
@@ -381,3 +392,4 @@ class TaskManager {
 }
 
 module.exports = { TaskManager };
+

@@ -25,6 +25,8 @@
     iopaintIdleMinutes: "longStitch.iopaintIdleMinutes"
   };
   var VALID_PANELS = {
+    "cutout-panel": true,
+    "library-panel": true,
     "bridge-panel": true,
     "stitch-panel": true,
     "framework-panel": true,
@@ -660,6 +662,7 @@
       setNavButtonActive(dom.navByPanel && dom.navByPanel[panelId], true);
     }
     if (content) content.classList.toggle("guides-content-active", panelId === "guides-panel");
+    if (content) content.classList.toggle("library-content-active", panelId === "library-panel");
     /* 首帧完成后移除只用于防白屏的初始属性，后续不再触发全局选择器重算。 */
     document.documentElement.removeAttribute("data-initial-panel");
     state.panelDomReady = true;
@@ -683,7 +686,9 @@
 
     if (!skipAnnouncement) {
       setStatus(
-        panelId === "framework-panel"
+        panelId === "library-panel"
+          ? "点击素材应用到当前文档；无文档时按素材尺寸新建"
+          : panelId === "framework-panel"
           ? "按行列表达式生成矩形、圆形或方形自定义框架"
           : panelId === "spacing-panel"
           ? "在 Photoshop 图层面板中选择一张图片后设置间距"
@@ -1974,17 +1979,12 @@
     }
 
     setSliceBusy(true);
-    setStatus("正在判断文档类型并优先寻找贯穿画布的横向分割带…");
+    setStatus("智能切片 v2.3.47：正在分析当前画面的图层与板块边界…");
     var prepared = null;
     var analysis = null;
     window.setTimeout(function () {
       hostInvoke("prepareSmartSliceAnalysis", {}).then(function (result) {
         prepared = result;
-        if (result.mode === "stitch") {
-          setStatus("检测到拼图源记录，正在按原始图片边缘切片…");
-          return hostInvoke("createStitchSlices", {});
-        }
-
         setStatus("正在加载智能切片分析模块…");
         return ensureFeatureModule("smartSlice").then(function () {
           setStatus(

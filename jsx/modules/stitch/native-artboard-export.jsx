@@ -2,6 +2,28 @@
 var XinyangHostModules = $.global.XinyangHostModules || {};
 $.global.XinyangHostModules = XinyangHostModules;
 XinyangHostModules.nativeArtboardExport = function () {
+    // Strip excluded content only in the disposable export copy, before crop/ungroup.
+    function removeHiddenExportLayers(source, target) {
+        var index;
+        for (index = source.layers.length - 1; index >= 0; index -= 1) {
+            var original = source.layers[index];
+            var layer = target.layers[index];
+            if (!original.visible) {
+                // A hidden clipping base also hides the clipped chain above it.
+                var clipped = index - 1;
+                while (clipped >= 0 && source.layers[clipped].grouped) clipped -= 1;
+                var removeIndex;
+                for (removeIndex = index; removeIndex > clipped; removeIndex -= 1) {
+                    var excluded = target.layers[removeIndex];
+                    try { excluded.allLocked = false; } catch (ignoreUnlockExport) {}
+                    excluded.remove();
+                }
+                index = clipped + 1;
+            } else if (original.typename === "LayerSet") {
+                removeHiddenExportLayers(original, layer);
+            }
+        }
+    }
     function exportJpeg(sourceDocument, folder, quality, singleSquare) {
         var nativeFile = File(app.path.fsName + "/Presets/Scripts/ArtboardExport.inc");
         if (!nativeFile.exists) throw new Error("当前 Photoshop 缺少原生画板导出脚本 ArtboardExport.inc");
@@ -46,10 +68,11 @@ XinyangHostModules.nativeArtboardExport = function () {
                 app.activeDocument = sourceDocument;
                 temporary = sourceDocument.duplicate("__原生画板导出__");
                 app.activeDocument = temporary;
+                removeHiddenExportLayers(sourceDocument, temporary);
                 setEnabled("autoNestEnabled", false);
                 setEnabled("autoPositionEnabled", false);
                 setEnabled("autoExpandEnabled", false);
-                cleanUnseenAB(boards[index].AMid, info.all, options.exportArtboardBackground);
+                cleanUnseenAB(boards[index].AMid, getABLayerInfo().all, options.exportArtboardBackground);
                 var updated = getABLayerInfo().all;
                 var groups = unArtBoard(updated, temporary, boards[index].AMid, false, options);
                 if (!groups) throw new Error("原生画板拆分失败：" + boards[index].name);

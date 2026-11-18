@@ -42,6 +42,47 @@ body,
 .panel-nav {
   border-right-color: #30353d !important;
   background: linear-gradient(180deg, #202329, #1d2025) !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  padding: 7px 0 6px 3px !important;
+  scrollbar-width: auto;
+  scrollbar-color: #505965 transparent;
+}
+
+/* CEP uses Chromium pseudo-elements; keep short-panel navigation unobtrusive. */
+.panel-nav::-webkit-scrollbar {
+  width: 4px;
+  height: 0;
+}
+
+.panel-nav::-webkit-scrollbar-track,
+.panel-nav::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.panel-nav::-webkit-scrollbar-thumb {
+  min-height: 28px;
+  border: 0;
+  border-radius: 4px;
+  background: #505965;
+}
+
+.panel-nav::-webkit-scrollbar-thumb:hover {
+  background: #798594;
+}
+
+.panel-nav::-webkit-scrollbar-thumb:active {
+  background: #8ca8cb;
+}
+
+.panel-nav::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+@media (max-width: 320px) {
+  .panel-nav { padding-left: 1px !important; }
 }
 
 .nav-button.active,
@@ -304,6 +345,38 @@ footer {
   .panel-nav { border-right-color: #30353d !important; }
 }
 
+/* Keep settings headings aligned with the other panel headings at all widths. */
+#settings-panel {
+  padding-left: 11px !important;
+  padding-right: 11px !important;
+}
+#settings-panel > .ui-page-header {
+  padding-left: 10px !important;
+  padding-right: 10px !important;
+}
+@media (max-width: 340px) {
+  #settings-panel > .ui-page-header {
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+  }
+}
+#settings-panel > .settings-reload-card:not(.settings-guide-card) {
+  position: relative;
+}
+#settings-panel .settings-reload-card > .plugin-version {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  margin: 0 !important;
+  padding: 0 !important;
+  font-size: 10px;
+  line-height: 16px;
+  white-space: nowrap;
+}
+#settings-panel > .settings-reload-card:not(.settings-guide-card) .settings-copy > strong {
+  display: block;
+  padding-right: 106px;
+}
 @media (prefers-reduced-motion: reduce) {
   .tool-panel button,
   .tool-panel .button,

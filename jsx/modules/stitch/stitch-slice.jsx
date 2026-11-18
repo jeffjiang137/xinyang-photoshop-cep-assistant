@@ -563,15 +563,7 @@ XinyangHostModules.stitchSlice = function (deps) {
                 var start = output[output.length - 1];
                 var end = compact[index];
                 var span = end - start;
-                if (span > maximumGap) {
-                    var pieces = Math.ceil(span / maximumGap);
-                    var pieceIndex;
-                    for (pieceIndex = 1; pieceIndex < pieces; pieceIndex += 1) {
-                        var cut = Math.round(start + span * pieceIndex / pieces);
-                        if (cut - output[output.length - 1] < minimumGap) continue;
-                        output.push(cut);
-                    }
-                }
+                // The analyzer owns content safety; do not insert blind equal cuts.
                 if (end > output[output.length - 1]) output.push(end);
             }
             return uniqueIntegerValues(output);
@@ -716,6 +708,30 @@ XinyangHostModules.stitchSlice = function (deps) {
 
         function clippedSliceLayerSize(layer, canvasWidth, canvasHeight) {
             var size = layerSize(layer);
+            // Clipped image bounds include hidden pixels; intersect with the
+            // clipping base so hidden overflow cannot block a section boundary.
+            try {
+                if (layer.grouped) {
+                    var siblings = layer.parent.layers;
+                    var found = false;
+                    var clipIndex;
+                    for (clipIndex = 0; clipIndex < siblings.length; clipIndex += 1) {
+                        if (!found) {
+                            if (siblings[clipIndex].id === layer.id) found = true;
+                            continue;
+                        }
+                        if (siblings[clipIndex].grouped) continue;
+                        var base = layerSize(siblings[clipIndex]);
+                        var clippedRight = Math.min(size.left + size.width, base.left + base.width);
+                        var clippedBottom = Math.min(size.top + size.height, base.top + base.height);
+                        size.left = Math.max(size.left, base.left);
+                        size.top = Math.max(size.top, base.top);
+                        size.width = Math.max(0, clippedRight - size.left);
+                        size.height = Math.max(0, clippedBottom - size.top);
+                        break;
+                    }
+                }
+            } catch (ignoreClipBounds) {}
             var left = Math.max(0, Math.min(canvasWidth, size.left));
             var top = Math.max(0, Math.min(canvasHeight, size.top));
             var right = Math.max(
@@ -803,6 +819,7 @@ XinyangHostModules.stitchSlice = function (deps) {
                             )
                         ) && size.height < canvasHeight * 0.72;
 
+                        walk(layer, depth + 1, layerId);
                         if (atomic) {
                             output.push({
                                 id: layerId,
@@ -816,8 +833,6 @@ XinyangHostModules.stitchSlice = function (deps) {
                                 width: size.width,
                                 height: size.height
                             });
-                        } else {
-                            walk(layer, depth + 1, layerId);
                         }
                         continue;
                     }
@@ -860,17 +875,8 @@ XinyangHostModules.stitchSlice = function (deps) {
                 1,
                 Math.round(pixels(document.height))
             );
-            var stitchEntries = collectStitchSourceEntries(document);
-            if (stitchEntries.length) {
-                return {
-                    mode: "stitch",
-                    documentId: currentDocumentIdFor(document),
-                    width: canvasWidth,
-                    height: canvasHeight,
-                    sources: stitchEntries.length
-                };
-            }
-
+            // Smart slicing always analyzes the current artwork. Historical stitch
+            // source records belong only to the explicit stitch-slice command.
             var previousDialogs = app.displayDialogs;
             var previousUnits = app.preferences.rulerUnits;
             var temporary = null;
@@ -1444,10 +1450,33 @@ XinyangHostModules.stitchSlice = function (deps) {
             }
         }
 
+    // Strip excluded content only in the disposable export copy, before crop/ungroup.
+    function removeHiddenExportLayers(source, target) {
+        var index;
+        for (index = source.layers.length - 1; index >= 0; index -= 1) {
+            var original = source.layers[index];
+            var layer = target.layers[index];
+            if (!original.visible) {
+                // A hidden clipping base also hides the clipped chain above it.
+                var clipped = index - 1;
+                while (clipped >= 0 && source.layers[clipped].grouped) clipped -= 1;
+                var removeIndex;
+                for (removeIndex = index; removeIndex > clipped; removeIndex -= 1) {
+                    var excluded = target.layers[removeIndex];
+                    try { excluded.allLocked = false; } catch (ignoreUnlockExport) {}
+                    excluded.remove();
+                }
+                index = clipped + 1;
+            } else if (original.typename === "LayerSet") {
+                removeHiddenExportLayers(original, layer);
+            }
+        }
+    }
         function duplicateForSliceExport(sourceDocument, name) {
             var temporary = sourceDocument.duplicate(name);
             try {
                 copySliceLayerVisibility(sourceDocument, temporary);
+            removeHiddenExportLayers(sourceDocument, temporary);
             } catch (error) {
                 // The caller cannot close a duplicate that was never returned.
                 try { temporary.close(SaveOptions.DONOTSAVECHANGES); } catch (ignoreCloseFailedDuplicate) {}
@@ -1459,6 +1488,32 @@ XinyangHostModules.stitchSlice = function (deps) {
 
         function sliceSaveForWebJpeg(document, outputFile, quality) {
             var webQuality = Math.max(55, Math.min(95, Math.round(Number(quality) || 82)));
+            // Large PSB canvases must bypass Save for Web. Prepare a disposable copy.
+            if (pixels(document.width) > 8192 || pixels(document.height) > 8192) {
+                if (pixels(document.width) > 65500 || pixels(document.height) > 65500) {
+                    throw new Error("长图超过 JPG 尺寸范围，请先添加参考线分段导出切片");
+                }
+                var jpegCopy = null;
+                var jpegPrevious = app.activeDocument;
+                try {
+                    jpegCopy = duplicateForSliceExport(document, "__长图JPG导出__");
+                    app.activeDocument = jpegCopy;
+                    if (jpegCopy.mode !== DocumentMode.RGB) jpegCopy.changeMode(ChangeMode.RGB);
+                    jpegCopy.bitsPerChannel = BitsPerChannelType.EIGHT;
+                    fillDocumentWhite(jpegCopy);
+                    try { jpegCopy.convertProfile("sRGB IEC61966-2.1", Intent.RELATIVECOLORIMETRIC, true, false); } catch (ignoreLongProfile) {}
+                    var jpegOptions = new JPEGSaveOptions();
+                    jpegOptions.quality = Math.max(0, Math.min(12, Math.round(webQuality * 12 / 100)));
+                    jpegOptions.embedColorProfile = false;
+                    jpegCopy.saveAs(outputFile, jpegOptions, true, Extension.LOWERCASE);
+                    if (!outputFile.exists || outputFile.length <= 0) throw new Error("长图 JPG 未成功保存");
+                } finally {
+                    if (jpegCopy) { try { jpegCopy.close(SaveOptions.DONOTSAVECHANGES); } catch (ignoreLongClose) {} }
+                    try { app.activeDocument = jpegPrevious; } catch (ignoreLongRestore) {}
+                }
+                return;
+            }
+
             try { if (document.mode !== DocumentMode.RGB) document.changeMode(ChangeMode.RGB); } catch (ignoreSliceWebMode) {}
             try { document.bitsPerChannel = BitsPerChannelType.EIGHT; } catch (ignoreSliceWebBits) {}
             /* JPEG 不支持透明区域：以白色合成，避免导出出现黑底。 */

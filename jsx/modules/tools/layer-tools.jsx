@@ -154,12 +154,9 @@ XinyangHostModules.layerTools = function (deps) {
                         var hasEmbeddedImage = firstGrouped || secondGrouped;
                         var orderSwapped = false;
                         try {
-                            /* Ordinary layers swap only their canvas positions. Preserve the
-                               existing slot-and-clipping restoration path for embedded images. */
-                            if (hasEmbeddedImage) {
-                                toolSwapLayerSlots(first, second, firstGrouped, secondGrouped);
-                                orderSwapped = true;
-                            }
+                            // Exchange stacking slots for every pair, including ordinary layers.
+                            toolSwapLayerSlots(first, second, firstGrouped, secondGrouped);
+                            orderSwapped = true;
                             toolMoveLayerCenterTo(first, secondCenterX, secondCenterY);
                             toolMoveLayerCenterTo(second, firstCenterX, firstCenterY);
                         } catch (swapError) {

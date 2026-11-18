@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
   "use strict";
 
   if (window.XinyangRuntime) return;
@@ -7,8 +7,9 @@
    * 变更版本号会让 CEP 和 Photoshop 同时放弃之前常驻的宿主对象。
    * v2.2.58 曾在按需加载改造期间缓存过不完整的 LongStitchCEP，
    * 拼图入口最容易因此停留在旧方法表。
+   * v2.3.72 减少文字按钮背景生成时的样式读取和图层变换。
    */
-  var VERSION = "2.3.20";
+  var VERSION = "2.3.72";
   var cs = new CSInterface();
   var modulePromises = {};
   var loadedModules = {};
@@ -37,6 +38,7 @@
   };
 
   var PANEL_MODULES = {
+    "library-panel": ["libraryStore", "libraryPreferences", "libraryPanel"],
     "bridge-panel": ["photoshopBridge"],
     "framework-panel": ["framework"],
     "document-panel": ["toolsImportExport", "toolsTransform", "tools"],
@@ -56,6 +58,9 @@
   };
 
   var MODULE_PATHS = {
+    libraryStore: "js/modules/library/store.js?v=" + VERSION,
+    libraryPreferences: "js/modules/library/preferences.js?v=" + VERSION,
+    libraryPanel: "js/modules/library/panel.js?v=" + VERSION,
     photoshopBridge: "js/modules/bridge/panel.js?v=" + VERSION,
     framework: "js/framework.js?v=" + VERSION,
     tools: "js/tools.js?v=" + VERSION,
@@ -77,6 +82,9 @@
   };
 
   var MODULE_GLOBALS = {
+    libraryStore: "XinyangLibraryStore",
+    libraryPreferences: "XinyangLibraryPreferences",
+    libraryPanel: "XinyangLibraryPanel",
     baiduTranslator: "XinyangBaiduTranslator",
     fileIO: "XinyangFileIO",
     settingsStorage: "XinyangStorage",

@@ -131,6 +131,7 @@ function createRuntime(options) {
       return saveManager.save(
         metadata => manager.execute({
           operation: 'save_document',
+          command: { action: 'save_document', documentId: request.documentId, path: request.path || null },
           documentId: request.documentId,
           handler: () => executeRaw({ action: 'save_document', documentId: request.documentId, path: request.path || null })
         }),

@@ -1,4 +1,4 @@
-/* 鑫洋助理工具模块：typography（v2.2.58） */
+﻿/* 鑫洋助理工具模块：typography（v2.2.58） */
 (function (global) {
   "use strict";
   if (global.XinyangToolsTypography) return;
@@ -26,6 +26,16 @@
 
       var fontsLoaded = false;
       var fontCatalog = [];
+      var fontsByFamily = {};
+      var fontsByName = {};
+      var fontFamilies = [];
+      var fontCatalogRevision = 0;
+      var renderedFamilyRevision = -1;
+      var renderedStyleSignature = "";
+      var renderedChipSignature = "";
+      var renderedQuickSignature = "";
+      var fontSearchQuery = "";
+      var pendingTextSelectionSignature = "";
       var fontLoadComplete = false;
       var fontRequested = false;
       var fontNextOffset = 0;
@@ -184,20 +194,37 @@
       }
 
       function uniqueFontFamilies() {
-        var output = [];
-        var seen = {};
-        fontCatalog.forEach(function (font) {
-          var family = String(font.family || font.postScriptName || "");
-          if (!family || seen[family]) return;
-          seen[family] = true;
-          output.push(family);
-        });
-        return output.sort(function (a, b) {
+        return fontFamilies;
+      }
+
+      function indexFont(font) {
+        var family = String(font.family || font.postScriptName || "");
+        if (!family) return;
+        var key = "$" + family;
+        if (!fontsByFamily[key]) {
+          fontsByFamily[key] = [];
+          fontFamilies.push(family);
+        }
+        fontsByFamily[key].push(font);
+        fontsByName["$" + String(font.postScriptName || "")] = font;
+      }
+
+      function sortFontFamilies() {
+        fontFamilies.sort(function (a, b) {
           var leftPriority = pinnedFontPriority(a);
           var rightPriority = pinnedFontPriority(b);
           if (leftPriority !== rightPriority) return leftPriority - rightPriority;
           return a.localeCompare(b);
         });
+      }
+
+      function familyFonts(family) {
+        return fontsByFamily["$" + String(family || "")] || [];
+      }
+
+      function fontResultsAreOpen() {
+        var results = $("#tool-font-results");
+        return !!(results && results.classList.contains("open"));
       }
 
       function fontCategoryMatch(family, category) {
@@ -235,11 +262,13 @@
         if (!combo || !results || !arrow) return;
         combo.classList.toggle("open", !!open);
         results.classList.toggle("open", !!open);
+        var search = $("#tool-font-search");
+        if (search) search.setAttribute("aria-expanded", open ? "true" : "false");
         setWordsDisclosureState(arrow, !!open);
         if (open) {
           positionFontResults();
         } else {
-          var search = $("#tool-font-search");
+          fontSearchQuery = "";
           if (search) search.value = String(config.fontFamily || "");
           var category = $("#words-font-category");
           var categoryButton = $('#words-font-tabs [data-font-filter="category"]');
@@ -252,6 +281,7 @@
       }
 
       function openFontResultsFresh() {
+        fontSearchQuery = "";
         setNodeValue("#tool-font-search", "");
         renderFontFamilyResults("");
         setFontResultsOpen(true);
@@ -261,7 +291,7 @@
         var results = $("#words-font-result-list") || $("#tool-font-results");
         if (!results) return;
         if (!fontsLoaded) {
-          results.innerHTML = '<div class="text-font-empty">点击右侧箭头读取 Photoshop 字体</div>';
+          results.innerHTML = '<div class="text-font-empty">正在读取 Photoshop 字体…</div>';
           return;
         }
         var keyword = String(query || "").trim().toLowerCase();
@@ -283,10 +313,11 @@
       function selectedFontEntry() {
         var family = nodeValue("#tool-font-family", config.fontFamily);
         var style = nodeValue("#tool-font-style", config.fontStyle);
-        var exact = fontCatalog.filter(function (font) {
+        var entries = familyFonts(family);
+        var exact = entries.filter(function (font) {
           return String(font.family || "") === family && String(font.style || "") === style;
         });
-        return exact[0] || fontCatalog.filter(function (font) { return String(font.family || "") === family; })[0] || null;
+        return exact[0] || entries[0] || null;
       }
 
       function cssWeightFromFontStyle(style) {
@@ -303,15 +334,22 @@
       }
 
       function renderFontStyleChips() {
-        var family = nodeValue("#tool-font-family", config.fontFamily);
-        var styles = fontCatalog.filter(function (font) { return String(font.family || "") === family; });
+        var family = config.fontFamily;
+        var styles = familyFonts(family);
         var container = $("#font-style-chips");
         if (!container) return;
+        var signature = JSON.stringify([family, config.fontStyle, styles.length, fontLoadComplete]);
+        if (signature === renderedChipSignature) return;
+        renderedChipSignature = signature;
+        if (!styles.length) {
+          container.innerHTML = '<button type="button" disabled aria-label="当前字重" title="' + escapeHtml(config.fontStyle || (fontLoadComplete ? "无可用字重" : "读取字重…")) + '"><span class="words-weight-sample" style="font-weight:' + cssWeightFromFontStyle(config.fontStyle) + '">T</span></button>';
+          return;
+        }
         container.innerHTML = styles.map(function (font) {
           var style = String(font.style || "常规");
-          var selected = String(nodeValue("#tool-font-style", "")) === style;
+          var selected = String(config.fontStyle || "常规") === style;
           var fontName = String(font.postScriptName || family || "sans-serif");
-          return '<button type="button" data-font-style="' + escapeHtml(style) + '" aria-pressed="' + (selected ? "true" : "false") + '" title="' + escapeHtml(style) + '" class="' + (selected ? "active" : "") + '"><span style="font-family:' + escapeHtml(fontName) + ';font-weight:' + cssWeightFromFontStyle(style) + '">T</span></button>';
+          return '<button type="button" data-font-style="' + escapeHtml(style) + '" aria-label="字重：' + escapeHtml(style) + '" aria-pressed="' + (selected ? "true" : "false") + '" title="' + escapeHtml(style) + '" class="' + (selected ? "active" : "") + '"><span class="words-weight-sample" style="font-family:' + escapeHtml(fontName) + ';font-weight:' + cssWeightFromFontStyle(style) + '">T</span></button>';
         }).join("");
       }
 
@@ -332,46 +370,68 @@
 
       function populateFontStyles(preferredStyle, passive) {
         var family = nodeValue("#tool-font-family", config.fontFamily);
-        var styles = fontCatalog.filter(function (font) { return String(font.family || "") === family; });
+        var styles = familyFonts(family);
         var select = $("#tool-font-style");
         if (!select) return;
-        select.innerHTML = "";
-        styles.forEach(function (font) {
-          var option = document.createElement("option");
-          option.value = String(font.style || "常规");
-          option.textContent = String(font.style || "常规");
-          select.appendChild(option);
-        });
-        if (preferredStyle && styles.some(function (font) { return String(font.style || "") === String(preferredStyle); })) select.value = preferredStyle;
+        var signature = JSON.stringify([family, styles.length, passive ? preferredStyle : ""]);
+        if (signature !== renderedStyleSignature) {
+          renderedStyleSignature = signature;
+          select.innerHTML = "";
+          styles.forEach(function (font) {
+            var option = document.createElement("option");
+            option.value = String(font.style || "常规");
+            option.textContent = option.value;
+            select.appendChild(option);
+          });
+          // A partial catalog must not silently pick another weight.
+          if (passive && preferredStyle && !styles.some(function (font) { return String(font.style || "常规") === preferredStyle; })) {
+            var currentOption = document.createElement("option");
+            currentOption.value = preferredStyle;
+            currentOption.textContent = preferredStyle;
+            select.appendChild(currentOption);
+          }
+        }
+        if (preferredStyle && (passive || styles.some(function (font) { return String(font.style || "常规") === String(preferredStyle); }))) select.value = preferredStyle;
         if (!passive) syncFontSelection();
+        else renderFontStyleChips();
       }
 
       function populateFontFamilies(passive) {
         var select = $("#tool-font-family");
         if (!select) return;
-        var match = fontCatalog.filter(function (font) { return String(font.postScriptName || "") === String(config.font || ""); })[0];
-        var preferredFamily = config.fontFamily || (match && match.family) || uniqueFontFamilies()[0] || "";
-        var preferredStyle = config.fontStyle || (match && match.style) || "";
-        select.innerHTML = "";
-        uniqueFontFamilies().forEach(function (family) {
-          var option = document.createElement("option");
-          option.value = family;
-          option.textContent = family;
-          select.appendChild(option);
-        });
+        var match = fontsByName["$" + String(config.font || "")];
+        var preferredFamily = (match && match.family) || config.fontFamily || "";
+        var preferredStyle = (match && match.style) || config.fontStyle || "";
+        if (match) { config.fontFamily = preferredFamily; config.fontStyle = preferredStyle; }
+        if (renderedFamilyRevision !== fontCatalogRevision) {
+          select.innerHTML = "";
+          uniqueFontFamilies().forEach(function (family) {
+            var option = document.createElement("option");
+            option.value = family;
+            option.textContent = family;
+            select.appendChild(option);
+          });
+          renderedFamilyRevision = fontCatalogRevision;
+        }
+        if (preferredFamily && !Array.prototype.some.call(select.options, function (option) { return option.value === preferredFamily; })) {
+          var currentOption = document.createElement("option");
+          currentOption.value = preferredFamily;
+          currentOption.textContent = preferredFamily;
+          select.appendChild(currentOption);
+        }
         if (preferredFamily) select.value = preferredFamily;
         populateFontStyles(preferredStyle, passive);
-        if (!passive) setNodeValue("#tool-font-search", select.value || preferredFamily);
-        renderFontFamilyResults(passive ? nodeValue("#tool-font-search", "") : "");
+        if (!fontResultsAreOpen()) setNodeValue("#tool-font-search", preferredFamily);
+        if (fontResultsAreOpen()) renderFontFamilyResults(fontSearchQuery);
         renderQuickFonts();
       }
 
       function loadFonts(quiet, openAfter, queryAfterLoad) {
         fontRequested = true;
         if (openAfter) {
-          if (arguments.length >= 3) setNodeValue("#tool-font-search", String(queryAfterLoad || ""));
-          else setNodeValue("#tool-font-search", "");
-          renderFontFamilyResults(nodeValue("#tool-font-search", ""));
+          fontSearchQuery = arguments.length >= 3 ? String(queryAfterLoad || "") : "";
+          setNodeValue("#tool-font-search", fontSearchQuery);
+          renderFontFamilyResults(fontSearchQuery);
           setFontResultsOpen(true);
         }
         if (fontLoadComplete) return Promise.resolve();
@@ -391,7 +451,7 @@
           function nextPage() {
             fontPageTimer = 0;
             if (generation !== fontLoadGeneration || !typographyPanelIsActive()) { finish(); return; }
-            if (isBusy() || typographyWriteInFlight || realtimeTextBusy) {
+            if (isBusy() || typographyWriteInFlight || realtimeTextBusy || typographyRefreshInFlight || textStyleReadInFlight || Object.keys(pendingTextFormattingFields).length) {
               fontPageTimer = window.setTimeout(nextPage, 160);
               return;
             }
@@ -401,6 +461,9 @@
               if (generation !== fontLoadGeneration) return;
               if (result.restart) {
                 fontCatalog = []; fontSeen = {}; fontNextOffset = 0;
+                fontsByFamily = {}; fontsByName = {}; fontFamilies = [];
+                fontCatalogRevision += 1;
+                renderedStyleSignature = ""; renderedChipSignature = "";
                 fontsLoaded = false; fontTotal = Number(result.total) || 0;
               } else {
                 var nextOffset = Number(result.nextOffset);
@@ -409,8 +472,10 @@
                 }
                 (result.fonts || []).forEach(function (font) {
                   var id = "$" + String(font.postScriptName || font.family + ":" + font.style);
-                  if (!fontSeen[id]) { fontSeen[id] = true; fontCatalog.push(font); }
+                  if (!fontSeen[id]) { fontSeen[id] = true; fontCatalog.push(font); indexFont(font); }
                 });
+                fontCatalogRevision += 1;
+                sortFontFamilies();
                 fontNextOffset = nextOffset;
                 fontTotal = Number(result.total) || 0;
                 fontsLoaded = fontCatalog.length > 0 || !result.hasMore;
@@ -419,7 +484,7 @@
               // Updating available choices must not change the current search,
               // chosen font or text formatting as additional pages arrive.
               populateFontFamilies(true);
-              if (typographyPanelIsActive() && !isBusy()) {
+              if (!quiet && typographyPanelIsActive() && !isBusy()) {
                 status(fontLoadComplete ? "已读取 " + fontCatalog.length + " 个 Photoshop 字体" :
                   "字体加载中：" + fontNextOffset + " / " + fontTotal + "，已加载字体可直接选择");
               }
@@ -432,7 +497,7 @@
               }
             });
           }
-          fontPageTimer = window.setTimeout(nextPage, 0);
+          fontPageTimer = window.setTimeout(nextPage, quiet && !openAfter ? 240 : 0);
         });
         return fontLoadPromise;
       }
@@ -477,12 +542,15 @@
         if (!quick.length && config.fontFamily) quick = [{ family: config.fontFamily }];
         if (config.quickFontIndex >= quick.length) config.quickFontIndex = 0;
         var current = quick[config.quickFontIndex] || null;
+        var styles = familyFonts(current && current.family);
+        var signature = JSON.stringify([quick, config.quickFontIndex, styles.length, fontsLoaded]);
+        if (signature === renderedQuickSignature) return;
+        renderedQuickSignature = signature;
         name.textContent = current ? current.family : "快捷字体";
         menu.innerHTML = quick.length ? quick.map(function (item, index) {
           return '<button type="button" data-quick-font-index="' + index + '">' + escapeHtml(item.family) + '<span data-remove-quick-font="' + index + '">×</span></button>';
         }).join("") : '<div class="text-font-empty">添加当前图层字体后显示</div>';
         if (!current || !fontsLoaded) { list.innerHTML = ""; return; }
-        var styles = fontCatalog.filter(function (font) { return String(font.family || "") === current.family; });
         list.innerHTML = styles.slice(0, 8).map(function (font) {
           var style = String(font.style || "常规");
           return '<button type="button" data-quick-font-style="' + escapeHtml(style) + '" title="' + escapeHtml(style) + '"><span>T</span><small>' + escapeHtml(style) + '</small></button>';
@@ -650,15 +718,13 @@
       function applyTypographySnapshot(result, after, quiet) {
         if (!result || !result.activeIsText || !result.style) return;
         var style = result.style || {};
-        var fontInfo = fontCatalog.filter(function (entry) {
-          return String(entry.postScriptName || "") === String(style.font || "");
-        })[0] || {};
+        var fontInfo = fontsByName["$" + String(style.font || "")] || {};
         config.font = style.font || config.font;
-        config.fontFamily = String(fontInfo.family || result.family || config.fontFamily);
-        config.fontStyle = String(fontInfo.style || result.fontStyle || config.fontStyle);
-        config.fontSize = Math.max(1, normalizeMetricNumber(style.size, 0, config.fontSize || 48));
-        config.tracking = Math.max(-1000, Math.min(10000, normalizeMetricNumber(style.tracking, 0, 0)));
-        config.leadingPoints = Math.max(1, normalizeMetricNumber(style.leading, 0, config.fontSize * 1.2));
+        config.fontFamily = String(fontInfo.family || result.family || style.font || "");
+        config.fontStyle = String(fontInfo.style || result.fontStyle || "");
+        if (style.size != null) config.fontSize = Math.max(1, normalizeMetricNumber(style.size, 0, config.fontSize || 48));
+        if (style.tracking != null) config.tracking = Math.max(-1000, Math.min(10000, normalizeMetricNumber(style.tracking, 0, 0)));
+        if (style.leading != null) config.leadingPoints = Math.max(1, normalizeMetricNumber(style.leading, 0, config.fontSize * 1.2));
         config.leading = config.leadingPoints / config.fontSize;
         config.textAlign = style.align || config.textAlign;
         config.textColor = style.color || config.textColor;
@@ -667,8 +733,29 @@
         config.allCaps = !!style.allCaps;
         config.opticalKern = !!style.opticalKern;
         config.textDirection = style.direction || "horizontal";
-        restoreWordsUi();
-        if (fontsLoaded) populateFontFamilies(true);
+        // Selection reads only update character controls. Rebuilding presets,
+        // settings and menus here used to steal focus and overwrite font search.
+        setNodeValue("#tool-font-input", config.font);
+        if (!fontResultsAreOpen()) setNodeValue("#tool-font-search", config.fontFamily);
+        setMetricNodeValue("#tool-font-size", config.fontSize, 0, 48);
+        setMetricNodeValue("#tool-tracking", config.tracking, 0, 0);
+        setMetricNodeValue("#tool-leading", config.leadingPoints, 0, 58);
+        [["#tool-font-size",result.size],["#tool-tracking",result.tracking],["#tool-leading",result.leading]].forEach(function (item) {
+          var node = $(item[0]);
+          if (!node) return;
+          node.setAttribute("placeholder", item[1] && item[1].mixed ? "混合" : "");
+          if (item[1] && item[1].mixed) node.value = "";
+        });
+        setNodeValue("#tool-text-align", config.textAlign);
+        setNodeValue("#tool-text-color", normalizeTextColorHex(config.textColor));
+        setNodeChecked("#words-optical-kern", config.opticalKern);
+        syncTextColorSwatch(config.textColor);
+        markTextToggle("fauxBold", config.fauxBold);
+        markTextToggle("fauxItalic", config.fauxItalic);
+        markTextToggle("allCaps", config.allCaps);
+        markAlign(config.textAlign);
+        markChip("font-size-chips", config.fontSize);
+        populateFontFamilies(true);
         saveConfig();
         if (!quiet) status("已识别文字属性：" + (result.layerName || "当前图层"));
         if (after) after(result);
@@ -686,7 +773,7 @@
       }
 
       function readCurrentTextStyle(after, quiet) {
-        if (textStyleReadInFlight || typographyRefreshInFlight || typographyWriteInFlight || (!quiet && isBusy())) return;
+        if (textStyleReadInFlight || typographyRefreshInFlight || typographyWriteInFlight || Object.keys(pendingTextFormattingFields).length || (!quiet && isBusy())) return;
         var readRevision = textFormattingRevision;
         textStyleReadInFlight = true;
         if (!quiet) setBusy(true, "正在识别当前选中文字图层属性…");
@@ -696,6 +783,7 @@
            * 这里拿到的可能还是旧字号；禁止它覆盖面板配置并被实时写回。
            */
           if (readRevision !== textFormattingRevision) return;
+          lastTextSelectionSignature = String(result && result.signature || "");
           recordTypographySnapshotPerformance(result);
           applyTypographySnapshot(result, after, quiet);
         }).catch(function (error) {
@@ -721,14 +809,15 @@
           typographyRefreshTimer = 0;
           if (!typographyPanelIsActive()) return;
           /* 写入、既有读取或其他面板宿主任务占用时不丢弃刷新请求。 */
-          if (typographyWriteInFlight || typographyRefreshInFlight || isBusy()) {
-            requestTypographyRefresh("deferred-" + String(reason || "refresh"), 240);
+          if (typographyWriteInFlight || typographyRefreshInFlight || textStyleReadInFlight || isBusy() || Object.keys(pendingTextFormattingFields).length) {
+            requestTypographyRefresh("deferred-" + String(reason || "refresh"), 120);
             return;
           }
           typographyRefreshQueued = false;
           typographyRefreshInFlight = true;
+          var readRevision = textFormattingRevision;
           hostInvoke("toolsGetTypographySnapshot", { includeMixed: false }).then(function (result) {
-            if (requestId !== typographyRefreshRequestId || typographyWriteInFlight) return;
+            if (requestId !== typographyRefreshRequestId || typographyWriteInFlight || readRevision !== textFormattingRevision || Object.keys(pendingTextFormattingFields).length) return;
             lastTextSelectionSignature = String(result && result.signature || "");
             recordTypographySnapshotPerformance(result);
             applyTypographySnapshot(result, null, true);
@@ -736,7 +825,7 @@
             /* 同步失败不干扰 Photoshop 原生操作；下次事件/兜底会再校正。 */
           }).then(function () {
             typographyRefreshInFlight = false;
-            if (typographyRefreshQueued && typographyPanelIsActive()) requestTypographyRefresh("queued", 220);
+            if (typographyRefreshQueued && typographyPanelIsActive()) requestTypographyRefresh("queued", 100);
           });
         }, Number(delay) >= 0 ? Number(delay) : 200);
       }
@@ -772,13 +861,14 @@
             var payload;
             try { payload = JSON.parse(String(event && event.data || "").replace(/^ver1,/, "")); } catch (ignorePayload) { return; }
             var eventId = String(payload && (payload.eventID !== undefined ? payload.eventID : payload.eventId) || "");
-            if (eventId === "1936483188") requestTypographyRefresh("selection-change", 200);
+            if (eventId === "1936483188") requestTypographyRefresh("selection-change", 80);
           };
           try { cs.addEventListener(typographyEventName, typographyEventListener); } catch (ignoreListener) { typographyEventListener = null; }
           if (typographyEventListener) dispatchTypographyEvent("com.adobe.PhotoshopRegisterEvent", "1936483188");
         }
         scheduleTypographyFallback();
-        requestTypographyRefresh("panel-open", 180);
+        requestTypographyRefresh("panel-open", 30);
+        if (!fontLoadComplete) loadFonts(true);
         return true;
       }
 
@@ -813,6 +903,7 @@
       function markTextFormattingFields(fields) {
         var normalized = normalizeTextFormattingFields(fields);
         var hasField = false;
+        if (!Object.keys(pendingTextFormattingFields).length) pendingTextSelectionSignature = lastTextSelectionSignature;
         Object.keys(normalized).forEach(function (field) {
           pendingTextFormattingFields[field] = true;
           hasField = true;
@@ -863,6 +954,7 @@
       function realtimeTextPayload(fields) {
         var payload = textFormattingPayload(fields, true);
         payload.realtime = true;
+        if (pendingTextSelectionSignature) payload.expectedSelectionSignature = pendingTextSelectionSignature;
         return payload;
       }
 
@@ -871,7 +963,7 @@
         if (isBusy() || realtimeTextBusy || typographyWriteInFlight) {
           realtimeTextQueued = true;
           window.clearTimeout(realtimeTextTimer);
-          realtimeTextTimer = window.setTimeout(runRealtimeTextFormatting, 250);
+          realtimeTextTimer = window.setTimeout(runRealtimeTextFormatting, 60);
           return;
         }
         var fields = takePendingTextFormattingFields();
@@ -887,9 +979,9 @@
           realtimeTextBusy = false;
           typographyWriteInFlight = false;
           if (realtimeTextQueued || Object.keys(pendingTextFormattingFields).length) {
-            scheduleRealtimeTextFormatting(260);
+            scheduleRealtimeTextFormatting(0);
           } else {
-            requestTypographyRefresh("write-complete", 180);
+            requestTypographyRefresh("write-complete", 100);
           }
         });
       }
@@ -898,7 +990,7 @@
         if (!realtimeTextReady) return;
         if (fields) markTextFormattingFields(fields);
         window.clearTimeout(realtimeTextTimer);
-        realtimeTextTimer = window.setTimeout(runRealtimeTextFormatting, Math.max(250, Number(delay) || 300));
+        realtimeTextTimer = window.setTimeout(runRealtimeTextFormatting, isFinite(Number(delay)) ? Math.max(0, Number(delay)) : 75);
       }
 
       function readAdvancedConfig() {
@@ -944,7 +1036,7 @@
 
       function runTextStructure(action) {
         if (isBusy()) return;
-        var labels = { splitLines: "拆开多行", splitChars: "词组拆开", mergeLines: "合并多行", mergeParagraph: "合并成段落" };
+        var labels = { splitLines: "拆开多行", splitChars: "词组拆开", mergeLines: "合并多行", mergeParagraph: "段落/点文本" };
         setBusy(true, "正在" + labels[action] + "…");
         hostInvoke("toolsTextStructure", { action: action, order: "topdown" }).then(function (result) {
           var layoutText = action === "mergeLines"
@@ -1081,9 +1173,29 @@
           var texts = items.map(function (item) { return String(item.text || ""); });
           var totalCharacters = texts.reduce(function (sum, text) { return sum + text.length; }, 0);
           status("正在使用百度翻译处理 " + items.length + " 个文字图层（" + totalCharacters + " 字符）…");
-          return module.translateBatch(texts, {
-            sourceLanguage: config.translateFrom,
-            targetLanguage: config.translateTo
+          // Auto mode chooses a direction per text layer; preserve result ordering.
+          var groups = {}, translated = new Array(texts.length), sequence = Promise.resolve();
+          texts.forEach(function (text, index) {
+            var target = config.translateTo;
+            if (config.translateFrom === "auto" && (target === "en" || target === "zh")) {
+              target = /[\u3400-\u9fff]/.test(text) ? "en" : /[a-z]/i.test(text) ? "zh" : target;
+            }
+            if (!groups[target]) groups[target] = [];
+            groups[target].push({ text: text, index: index });
+          });
+          Object.keys(groups).forEach(function (target) {
+            sequence = sequence.then(function () {
+              var group = groups[target];
+              return module.translateBatch(group.map(function (entry) { return entry.text; }), {
+                sourceLanguage: config.translateFrom,
+                targetLanguage: target
+              }).then(function (results) {
+                if (!results || results.length !== group.length) throw new Error("百度翻译返回结果数量不一致");
+                group.forEach(function (entry, index) { translated[entry.index] = results[index]; });
+              });
+            });
+          });
+          return sequence.then(function () { return translated;
           }).then(function (results) {
             if (!results || results.length !== items.length) throw new Error("百度翻译返回结果数量不一致");
             return items.map(function (item, index) {
@@ -1247,9 +1359,6 @@
       var typographyNav = document.querySelector('.nav-button[data-panel="typography-panel"]');
       if (typographyNav) typographyNav.addEventListener("click", function () {
         ensureTextSelectionListener();
-        // Font enumeration is only needed when opening the font picker.
-        // ensureTextSelectionListener already schedules the lightweight snapshot.
-        if (fontRequested && !fontLoadComplete) loadFonts(true);
       });
 
       bindNode("#tool-load-fonts", "click", function (event) {
@@ -1269,14 +1378,41 @@
         if (fontsLoaded) openFontResultsFresh();
         if (!fontLoadComplete) loadFonts(true, true);
       });
+      // Escape can close the list without blurring the input. Reopening by
+      // clicking it must still browse all families, not filter by its label.
+      bindNode("#tool-font-search", "click", function () {
+        if (!fontResultsAreOpen()) {
+          openFontResultsFresh();
+          if (!fontLoadComplete) loadFonts(true);
+        }
+      });
       bindNode("#tool-font-search", "input", function () {
         var query = nodeValue("#tool-font-search", "");
+        fontSearchQuery = query;
         renderFontFamilyResults(query); setFontResultsOpen(true);
         if (!fontLoadComplete) loadFonts(true, true, query);
       });
       bindNode("#tool-font-search", "keydown", function (event) {
+        if (event.isComposing || event.keyCode === 229) return;
         if (event.key === "Escape" || event.keyCode === 27) setFontResultsOpen(false);
         if (event.key === "Enter" || event.keyCode === 13) { var first = $("#words-font-result-list .text-font-result"); if (first) { event.preventDefault(); selectFontFamily(decodeURIComponent(first.getAttribute("data-font-family"))); } }
+        if (event.key === "ArrowDown" || event.keyCode === 40) {
+          event.preventDefault();
+          if (!fontResultsAreOpen()) openFontResultsFresh();
+          var firstResult = $("#words-font-result-list .text-font-result");
+          if (firstResult) firstResult.focus();
+        }
+      });
+      bindNode("#tool-font-results", "keydown", function (event) {
+        var button = event.target.closest("[data-font-family]");
+        if (!button) return;
+        if (event.key === "Escape") { event.preventDefault(); $("#tool-font-search").focus(); setFontResultsOpen(false); }
+        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+          event.preventDefault();
+          var next = event.key === "ArrowDown" ? button.nextElementSibling : button.previousElementSibling;
+          if (next) next.focus();
+          else if (event.key === "ArrowUp") $("#tool-font-search").focus();
+        }
       });
       bindNode("#tool-font-results", "click", function (event) {
         var familyButton = event.target.closest("[data-font-family]");
@@ -1372,6 +1508,18 @@
       ["tool-font-size","tool-tracking","tool-leading"].forEach(function (id) {
         ["input","change"].forEach(function (eventName) {
           bindNode("#" + id, eventName, function () {
+            var field = id === "tool-font-size" ? "size" : id === "tool-leading" ? "leadingPoints" : "tracking";
+            var raw = String(nodeValue("#" + id, "")).trim();
+            if (!raw || !isFinite(Number(raw))) {
+              // Clearing a field, or typing the minus sign for tracking, is an
+              // unfinished edit, not a request for size 1 / tracking 0.
+              delete pendingTextFormattingFields[field];
+              textFormattingRevision += 1;
+              if (eventName === "change") {
+                setMetricNodeValue("#" + id, field === "size" ? config.fontSize : field === "leadingPoints" ? config.leadingPoints : config.tracking, 0, 0);
+              }
+              return;
+            }
             readTextConfig();
             if (eventName === "change") {
               if (id === "tool-font-size") setMetricNodeValue("#tool-font-size", config.fontSize, 0, 48);
@@ -1379,7 +1527,7 @@
               else setMetricNodeValue("#tool-tracking", config.tracking, 0, 0);
             }
             markChip("font-size-chips", config.fontSize);
-            scheduleRealtimeTextFormatting(eventName === "input" ? 75 : 20, id === "tool-font-size" ? "size" : id === "tool-leading" ? "leadingPoints" : "tracking");
+            scheduleRealtimeTextFormatting(eventName === "input" ? 75 : 20, field);
           });
         });
       });
@@ -1403,7 +1551,7 @@
       bindNode("#words-translate-button", "click", runTranslation);
       bindNode("#words-translate-button", "contextmenu", function(event){event.preventDefault();event.stopPropagation();var panel=$("#words-translate-panel");closeWordsPopovers(panel);toggleHidden(panel);});
       bindNode("#words-translate-run", "click", function(){closeWordsPopovers();runTranslation();});
-      bindNode("#words-switch-language", "click", function(){var from=normalizeTranslationLanguage(nodeValue("#words-translate-from","auto"),"auto"),to=normalizeTranslationLanguage(nodeValue("#words-translate-to","en"),"en");if(from!=="auto"){setNodeValue("#words-translate-from",to);setNodeValue("#words-translate-to",from);config.translateFrom=to;config.translateTo=from;syncBaiduTranslationPreferences(to,from);saveConfig();}});
+      bindNode("#words-switch-language", "click", function(){var from=normalizeTranslationLanguage(nodeValue("#words-translate-from","auto"),"auto"),to=normalizeTranslationLanguage(nodeValue("#words-translate-to","en"),"en");if(from==="auto") from=to==="en"?"zh":"en";{setNodeValue("#words-translate-from",to);setNodeValue("#words-translate-to",from);config.translateFrom=to;config.translateTo=from;syncBaiduTranslationPreferences(to,from);saveConfig();}});
       bindNode("#words-translate-from", "change", function(){config.translateFrom=normalizeTranslationLanguage(this.value,"auto");syncBaiduTranslationPreferences(config.translateFrom,nodeValue("#words-translate-to","en"));saveConfig();});
       bindNode("#words-translate-to", "change", function(){config.translateTo=normalizeTranslationLanguage(this.value,"en");syncBaiduTranslationPreferences(nodeValue("#words-translate-from","auto"),config.translateTo);saveConfig();});
       window.addEventListener("xinyang:baidu-settings-changed", function(event){var detail=event&&event.detail||{};config.translateFrom=normalizeTranslationLanguage(detail.sourceLanguage,"auto");config.translateTo=normalizeTranslationLanguage(detail.targetLanguage,"en");setNodeValue("#words-translate-from",config.translateFrom);setNodeValue("#words-translate-to",config.translateTo);saveConfig();});

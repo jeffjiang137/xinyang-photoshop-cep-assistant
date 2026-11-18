@@ -1481,7 +1481,60 @@
         }
       }
 
-      var background = dominantColor(backgroundHistogram);
+      /* OCR boxes often end inside a heavy glyph. Their inner perimeter is
+       * therefore not a reliable background sample: a brown headline can be
+       * mistaken for the background and its cream paper chosen as the fill.
+       * Prefer a narrow exterior collar, with the inner perimeter as fallback
+       * for edge-clipped crops or a collar crossing the text's background.
+       * Keep it local: a wide ring can cross a badge or text panel boundary
+       * and sample an unrelated surface. */
+      var exteriorHistogram = {};
+      var exteriorCount = 0;
+      var collar = Math.max(1, Math.min(3, Math.round(Math.min(width, height) * 0.04)));
+      var exteriorStride = Math.min(2, stride);
+      var outerLeft = Math.max(0, left - collar);
+      var outerTop = Math.max(0, top - collar);
+      var outerRight = Math.min(canvasWidth, right + collar);
+      var outerBottom = Math.min(canvasHeight, bottom + collar);
+      for (y = outerTop; y < outerBottom; y += exteriorStride) {
+        for (x = outerLeft; x < outerRight; x += exteriorStride) {
+          if (x >= left && x < right && y >= top && y < bottom) continue;
+          offset = (y * canvasWidth + x) * 4;
+          if (data[offset + 3] < 32) continue;
+          addColorSample(exteriorHistogram, data[offset], data[offset + 1],
+            data[offset + 2], 1);
+          exteriorCount += 1;
+        }
+      }
+      var innerBackground = dominantColor(backgroundHistogram);
+      var exteriorBackground = exteriorCount >= 12
+        ? dominantColor(exteriorHistogram) : null;
+      var background = exteriorBackground || innerBackground;
+      if (exteriorBackground && innerBackground &&
+          colorDistance(exteriorBackground, innerBackground) >= 52) {
+        // A box can touch the edge of a colored badge. Then the exterior
+        // belongs to another surface, not the local text background. Reject
+        // that sample when it would turn an almost uniform interior into ink.
+        // A thick headline has substantial holes/background inside its box,
+        // so it keeps the exterior evidence instead of reversing polarity.
+        var innerSupport = 0;
+        var exteriorSupport = 0;
+        var interiorCount = 0;
+        var supportThreshold = Math.max(22, Math.min(38,
+          colorDistance(exteriorBackground, innerBackground) * 0.16));
+        for (y = top; y < bottom; y += stride) {
+          for (x = left; x < right; x += stride) {
+            offset = (y * canvasWidth + x) * 4;
+            if (data[offset + 3] < 32) continue;
+            var sampleRgb = [data[offset], data[offset + 1], data[offset + 2]];
+            interiorCount += 1;
+            if (colorDistance(sampleRgb, innerBackground) <= supportThreshold) innerSupport += 1;
+            if (colorDistance(sampleRgb, exteriorBackground) <= supportThreshold) exteriorSupport += 1;
+          }
+        }
+        if (interiorCount && innerSupport / interiorCount >= 0.72 &&
+            exteriorSupport / interiorCount <= 0.26) background = innerBackground;
+      }
       if (!background) {
         if (!line.color) line.color = "#111111";
         return line;

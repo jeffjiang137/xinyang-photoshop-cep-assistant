@@ -1348,14 +1348,14 @@ XinyangHostModules.ocrHost = function (deps) {
             var sourceRight = Math.min(
                 canvasWidth,
                 Math.ceil(
-                    sourceLeft +
+                    safeNumber(sourceBounds && sourceBounds.left, 0) +
                     Math.max(1, safeNumber(sourceBounds && sourceBounds.width, canvasWidth))
                 )
             );
             var sourceBottom = Math.min(
                 canvasHeight,
                 Math.ceil(
-                    sourceTop +
+                    safeNumber(sourceBounds && sourceBounds.top, 0) +
                     Math.max(1, safeNumber(sourceBounds && sourceBounds.height, canvasHeight))
                 )
             );
@@ -1376,6 +1376,30 @@ XinyangHostModules.ocrHost = function (deps) {
                 );
                 stripSize = Math.min(stripSize, Math.max(1, sourceBottom - sourceTop));
                 guard = Math.max(3, Math.min(22, Math.round(box.height * 0.14)));
+            }
+
+            // These boxes already include 3-6px beyond the recognized ink.
+            // Start at that clean edge: a second large guard can jump across a
+            // background boundary, and wide strips miss narrow gaps between text.
+            var nearWidths = [6, 3, 2, 1];
+            var nearIndex;
+            for (nearIndex = 0; nearIndex < nearWidths.length; nearIndex += 1) {
+                var nearWidth = nearWidths[nearIndex];
+                if (mode === "horizontal") {
+                    candidates.push({ x: box.x - nearWidth, y: box.y,
+                        width: nearWidth, height: box.height, distance: 0,
+                        side: "left", avoidPadding: 0 });
+                    candidates.push({ x: box.x + box.width, y: box.y,
+                        width: nearWidth, height: box.height, distance: 0,
+                        side: "right", avoidPadding: 0 });
+                } else {
+                    candidates.push({ x: box.x, y: box.y - nearWidth,
+                        width: box.width, height: nearWidth, distance: 0,
+                        side: "top", avoidPadding: 0 });
+                    candidates.push({ x: box.x, y: box.y + box.height,
+                        width: box.width, height: nearWidth, distance: 0,
+                        side: "bottom", avoidPadding: 0 });
+                }
             }
 
             var step = Math.max(4, Math.round(stripSize * 0.75));
@@ -1436,13 +1460,15 @@ XinyangHostModules.ocrHost = function (deps) {
             var candidateIndex;
             for (candidateIndex = 0; candidateIndex < candidates.length; candidateIndex += 1) {
                 var raw = candidates[candidateIndex];
+                if (raw.x < sourceLeft || raw.y < sourceTop ||
+                    raw.x + raw.width > sourceRight || raw.y + raw.height > sourceBottom) continue;
                 var current = normalizedEraseBox(raw, canvasWidth, canvasHeight);
                 current.distance = raw.distance;
                 current.side = raw.side;
                 current.clean = true;
                 if (avoidBoxes && avoidBoxes.length) {
                     var avoidIndex;
-                    var avoidPadding = Math.max(2, Math.min(10, Math.round(guard * 0.35)));
+                    var avoidPadding = raw.avoidPadding === 0 ? 0 : Math.max(2, Math.min(10, Math.round(guard * 0.35)));
                     for (avoidIndex = 0; avoidIndex < avoidBoxes.length; avoidIndex += 1) {
                         if (rectanglesOverlapWithPadding(current, avoidBoxes[avoidIndex], avoidPadding)) {
                             current.clean = false;
@@ -1456,6 +1482,9 @@ XinyangHostModules.ocrHost = function (deps) {
             normalized.sort(function (left, right) {
                 if (left.clean !== right.clean) return left.clean ? -1 : 1;
                 if (left.distance !== right.distance) return left.distance - right.distance;
+                var leftSpan = mode === "horizontal" ? left.width : left.height;
+                var rightSpan = mode === "horizontal" ? right.width : right.height;
+                if (leftSpan !== rightSpan) return rightSpan - leftSpan;
                 if (mode === "horizontal") {
                     if (left.side === "left" && right.side !== "left") return -1;
                     if (right.side === "left" && left.side !== "left") return 1;
@@ -1479,12 +1508,14 @@ XinyangHostModules.ocrHost = function (deps) {
             var sourceTop = Math.max(0, Math.floor(safeNumber(sourceBounds && sourceBounds.top, 0)));
             var sourceRight = Math.min(
                 canvasWidth,
-                Math.ceil(sourceLeft + Math.max(1, safeNumber(sourceBounds && sourceBounds.width, canvasWidth)))
+                Math.ceil(safeNumber(sourceBounds && sourceBounds.left, 0) + Math.max(1, safeNumber(sourceBounds && sourceBounds.width, canvasWidth)))
             );
             var sourceBottom = Math.min(
                 canvasHeight,
-                Math.ceil(sourceTop + Math.max(1, safeNumber(sourceBounds && sourceBounds.height, canvasHeight)))
+                Math.ceil(safeNumber(sourceBounds && sourceBounds.top, 0) + Math.max(1, safeNumber(sourceBounds && sourceBounds.height, canvasHeight)))
             );
+            if ((mode === "horizontal" && (box.y < sourceTop || box.y + box.height > sourceBottom)) ||
+                (mode === "vertical" && (box.x < sourceLeft || box.x + box.width > sourceRight))) return null;
             if (mode === "horizontal") {
                 var width = Math.max(1, Math.min(12, Math.max(1, sourceRight - sourceLeft)));
                 var x = box.x - width >= sourceLeft
@@ -1521,6 +1552,11 @@ XinyangHostModules.ocrHost = function (deps) {
                     document.selection.deselect();
                     var patch = document.paste();
                     if (!patch) patch = document.activeLayer;
+                    var pastedSize = layerSize(patch);
+                    if (Math.abs(pastedSize.width - candidate.width) > 1 || Math.abs(pastedSize.height - candidate.height) > 1) {
+                        patch.remove();
+                        continue;
+                    }
                     return { patch: patch, sample: candidate };
                 } catch (candidateCopyError) {
                     try { document.selection.deselect(); } catch (ignoreCandidateDeselect) {}
@@ -1538,6 +1574,11 @@ XinyangHostModules.ocrHost = function (deps) {
             document.selection.deselect();
             var fallbackPatch = document.paste();
             if (!fallbackPatch) fallbackPatch = document.activeLayer;
+            var fallbackSize = layerSize(fallbackPatch);
+            if (Math.abs(fallbackSize.width - fallback.width) > 1 || Math.abs(fallbackSize.height - fallback.height) > 1) {
+                fallbackPatch.remove();
+                throw new Error("文字附近没有完整的干净像素带");
+            }
             return { patch: fallbackPatch, sample: fallback };
         }
 
@@ -1553,90 +1594,169 @@ XinyangHostModules.ocrHost = function (deps) {
             return { x: left, y: top, width: Math.max(1, right - left), height: Math.max(1, bottom - top) };
         }
 
-        function createStretchPatch(document, sourceLayer, root, box, mode, avoidBoxes) {
-            var canvasWidth = pixels(document.width);
-            var canvasHeight = pixels(document.height);
-            var sourceBounds = layerSize(sourceLayer);
-            var candidates = stretchSampleCandidates(
-                box,
-                mode,
-                canvasWidth,
-                canvasHeight,
-                sourceBounds,
-                avoidBoxes
-            );
-            var fallback = fallbackStretchSample(
-                box,
-                mode,
-                canvasWidth,
-                canvasHeight,
-                sourceBounds
-            );
-            if (avoidBoxes && avoidBoxes.length) {
-                var avoidIndex;
-                for (avoidIndex = 0; avoidIndex < avoidBoxes.length; avoidIndex += 1) {
-                    if (rectanglesOverlapWithPadding(fallback, avoidBoxes[avoidIndex], 0)) {
-                        fallback = null;
-                        break;
-                    }
-                }
+        /* Photoshop limits one resize to 10000%; a 1px/2px profile therefore
+         * needs multiple transforms for wide titles. Check actual bounds after
+         * every step rather than silently returning a 100px/200px repair. */
+        function resizeStretchPatch(patch, width, height) {
+            var attempt, size;
+            for (attempt = 0; attempt < 8; attempt += 1) {
+                size = layerSize(patch);
+                if (!(size.width > 0 && size.height > 0)) throw new Error("拉伸补片没有可用像素");
+                if (Math.abs(size.width - width) <= 0.5 && Math.abs(size.height - height) <= 0.5) return;
+                patch.resize(
+                    clampNumber(width / size.width * 100, 1, 10000),
+                    clampNumber(height / size.height * 100, 1, 10000),
+                    AnchorPosition.MIDDLECENTER
+                );
             }
-            var picked = pasteStretchSample(document, sourceLayer, candidates, fallback);
-            var patch = picked.patch;
-            var sample = picked.sample;
-            patch.name = mode === "horizontal"
-                ? "横向拉伸补片_智能取样"
-                : "纵向拉伸补片_智能取样";
-            patch.move(root, ElementPlacement.PLACEATBEGINNING);
+            size = layerSize(patch);
+            if (size.width < width - 0.5 || size.height < height - 0.5) {
+                throw new Error("拉伸补片未覆盖完整文字范围，请重新选择文字区域");
+            }
+        }
 
-            /*
-             * v2.2.04：先把较宽的邻近干净像素带压缩成 2px 纹理剖面，再拉伸。
-             * 这样会把采样带内零散的文字抗锯齿/小污点平均掉，同时保留与拉伸方向
-             * 垂直的渐变与明暗变化，避免旧算法直接放大边缘脏像素形成长条拖影。
-             */
-            var profileSize = 2;
+        function stretchPickedSample(document, picked, root, box, mode) {
+            var patch = picked.patch;
+            patch.move(root, ElementPlacement.PLACEATBEGINNING);
             var previousInterpolation = null;
             try {
                 previousInterpolation = app.preferences.interpolation;
                 app.preferences.interpolation = ResampleMethod.BICUBIC;
             } catch (ignoreStretchInterpolation) {}
             try {
-                var currentSize = layerSize(patch);
-                if (mode === "horizontal" && currentSize.width > profileSize) {
-                    patch.resize(
-                        clampNumber(profileSize / Math.max(1, currentSize.width) * 100, 1, 100),
-                        100,
-                        AnchorPosition.MIDDLECENTER
-                    );
-                } else if (mode === "vertical" && currentSize.height > profileSize) {
-                    patch.resize(
-                        100,
-                        clampNumber(profileSize / Math.max(1, currentSize.height) * 100, 1, 100),
-                        AnchorPosition.MIDDLECENTER
-                    );
-                }
-
-                currentSize = layerSize(patch);
-                var horizontalScale = mode === "horizontal"
-                    ? box.width / Math.max(1, currentSize.width) * 100
-                    : 100;
-                var verticalScale = mode === "vertical"
-                    ? box.height / Math.max(1, currentSize.height) * 100
-                    : 100;
-                patch.resize(
-                    clampNumber(horizontalScale, 1, 10000),
-                    clampNumber(verticalScale, 1, 10000),
-                    AnchorPosition.MIDDLECENTER
-                );
+                // Average only along the selected stretch axis. The orthogonal
+                // profile keeps background texture and lighting at every row/column.
+                var size = layerSize(patch);
+                resizeStretchPatch(patch, mode === "horizontal" ? 1 : size.width,
+                    mode === "vertical" ? 1 : size.height);
+                resizeStretchPatch(patch, box.width, box.height);
             } finally {
                 if (previousInterpolation !== null) {
                     try { app.preferences.interpolation = previousInterpolation; }
                     catch (ignoreRestoreStretchInterpolation) {}
                 }
             }
-            var size = layerSize(patch);
-            patch.translate(box.x - size.left, box.y - size.top);
+            var finalSize = layerSize(patch);
+            patch.translate(box.x - finalSize.left, box.y - finalSize.top);
+            retainOnlyEraseBoxes(document, patch, [box]);
             return patch;
+        }
+
+        function blendStretchProfiles(document, patch, firstSample, secondSample, mode) {
+            document.activeLayer = patch;
+            var c = charIDToTypeID;
+            var make = new ActionDescriptor(), mask = new ActionReference();
+            make.putClass(c("Nw  "), c("Chnl"));
+            mask.putEnumerated(c("Chnl"), c("Chnl"), c("Msk "));
+            make.putReference(c("At  "), mask);
+            make.putEnumerated(c("Usng"), c("UsrM"), c("RvlA"));
+            executeAction(c("Mk  "), make, DialogModes.NO);
+
+            // Explicitly select the new mask; never draw a gradient onto pixels.
+            var select = new ActionDescriptor(), maskRef = new ActionReference();
+            maskRef.putEnumerated(c("Chnl"), c("Chnl"), c("Msk "));
+            select.putReference(c("null"), maskRef);
+            executeAction(c("slct"), select, DialogModes.NO);
+            var gradient = new ActionDescriptor(), from = new ActionDescriptor(), to = new ActionDescriptor();
+            var firstX = firstSample.x + firstSample.width / 2;
+            var firstY = firstSample.y + firstSample.height / 2;
+            var secondX = secondSample.x + secondSample.width / 2;
+            var secondY = secondSample.y + secondSample.height / 2;
+            from.putUnitDouble(c("Hrzn"), c("#Pxl"), firstX);
+            from.putUnitDouble(c("Vrtc"), c("#Pxl"), firstY);
+            to.putUnitDouble(c("Hrzn"), c("#Pxl"), mode === "horizontal" ? secondX : firstX);
+            to.putUnitDouble(c("Vrtc"), c("#Pxl"), mode === "vertical" ? secondY : firstY);
+            gradient.putObject(c("From"), c("Pnt "), from);
+            gradient.putObject(c("T   "), c("Pnt "), to);
+            gradient.putEnumerated(c("Type"), c("GrdT"), c("Lnr "));
+            gradient.putEnumerated(c("Md  "), c("BlnM"), c("Nrml"));
+            gradient.putUnitDouble(c("Opct"), c("#Prc"), 100);
+            gradient.putBoolean(c("Dthr"), true);
+            gradient.putBoolean(c("UsMs"), true);
+            gradient.putBoolean(c("Rvrs"), false);
+            var definition = new ActionDescriptor(), colors = new ActionList(), transparencies = new ActionList();
+            definition.putString(c("Nm  "), "Stretch profile blend");
+            definition.putEnumerated(c("GrdF"), c("GrdF"), c("CstS"));
+            definition.putDouble(c("Intr"), 4096);
+            for (var stopIndex = 0; stopIndex < 2; stopIndex += 1) {
+                var stop = new ActionDescriptor(), rgb = new ActionDescriptor(), opacity = new ActionDescriptor();
+                rgb.putDouble(c("Rd  "), stopIndex * 255);
+                rgb.putDouble(c("Grn "), stopIndex * 255);
+                rgb.putDouble(c("Bl  "), stopIndex * 255);
+                stop.putObject(c("Clr "), c("RGBC"), rgb);
+                stop.putEnumerated(c("Type"), c("Clry"), c("UsrS"));
+                stop.putInteger(c("Lctn"), stopIndex * 4096);
+                stop.putInteger(c("Mdpn"), 50);
+                colors.putObject(c("Clrt"), stop);
+                opacity.putUnitDouble(c("Opct"), c("#Prc"), 100);
+                opacity.putInteger(c("Lctn"), stopIndex * 4096);
+                opacity.putInteger(c("Mdpn"), 50);
+                transparencies.putObject(c("TrnS"), opacity);
+            }
+            definition.putList(c("Clrs"), colors);
+            definition.putList(c("Trns"), transparencies);
+            gradient.putObject(c("Grad"), c("Grdn"), definition);
+            executeAction(c("Grdn"), gradient, DialogModes.NO);
+            // Bake only the temporary mask; source pixels and source masks stay intact.
+            var apply = new ActionDescriptor(), applyRef = new ActionReference();
+            applyRef.putEnumerated(c("Chnl"), c("Chnl"), c("Msk "));
+            apply.putReference(c("null"), applyRef);
+            apply.putBoolean(c("Aply"), true);
+            executeAction(c("Dlt "), apply, DialogModes.NO);
+        }
+
+        function createStretchPatch(document, sourceLayer, root, box, mode, avoidBoxes) {
+            var canvasWidth = pixels(document.width), canvasHeight = pixels(document.height);
+            var sourceBounds = layerSize(sourceLayer);
+            var candidates = stretchSampleCandidates(box, mode, canvasWidth, canvasHeight, sourceBounds, avoidBoxes);
+            var firstSide = mode === "horizontal" ? "left" : "top";
+            var secondSide = mode === "horizontal" ? "right" : "bottom";
+            var firstCandidates = [], secondCandidates = [], index;
+            for (index = 0; index < candidates.length; index += 1) {
+                if (!candidates[index].clean) continue;
+                if (candidates[index].side === firstSide) firstCandidates.push(candidates[index]);
+                if (candidates[index].side === secondSide) secondCandidates.push(candidates[index]);
+            }
+            var first = null, second = null;
+            if (firstCandidates.length) {
+                try { first = pasteStretchSample(document, sourceLayer, firstCandidates, null); }
+                catch (ignoreFirstSample) {}
+            }
+            if (secondCandidates.length) {
+                try { second = pasteStretchSample(document, sourceLayer, secondCandidates, null); }
+                catch (ignoreSecondSample) {}
+            }
+            if (!first && !second) {
+                var fallback = fallbackStretchSample(box, mode, canvasWidth, canvasHeight, sourceBounds);
+                for (index = 0; fallback && index < (avoidBoxes || []).length; index += 1) {
+                    if (rectanglesOverlapWithPadding(fallback, avoidBoxes[index], 0)) { fallback = null; break; }
+                }
+                first = pasteStretchSample(document, sourceLayer, [], fallback);
+            }
+            var base = first || second;
+            stretchPickedSample(document, base, root, box, mode);
+            base.patch.name = mode === "horizontal" ? "横向拉伸补片_双侧取样" : "纵向拉伸补片_双侧取样";
+            if (first && second) {
+                stretchPickedSample(document, second, root, box, mode);
+                second.patch.name = "拉伸补片_渐变过渡";
+                blendStretchProfiles(document, second.patch, first.sample, second.sample, mode);
+            }
+            return { patch: base.patch, samples: first && second ? 2 : 1 };
+        }
+
+        function softenStretchEdges(document, layer, boxes) {
+            document.activeLayer = layer;
+            selectRectangle(document, boxes[0]);
+            for (var index = 1; index < boxes.length; index += 1) {
+                extendRectangleSelection(document, boxes[index]);
+            }
+            // Feather only after combining the opposing profiles; feathering
+            // each side would expose the original ink twice through the blend.
+            // The original text stays inside the separately expanded 3-6px rim.
+            document.selection.feather(1.5);
+            document.selection.invert();
+            document.selection.clear();
+            document.selection.deselect();
         }
 
         function hidePreviousRepairLayer(job, replacementLayer) {
@@ -1797,8 +1917,9 @@ XinyangHostModules.ocrHost = function (deps) {
             for (index = 0; index < job.boxes.length; index += 1) {
                 stretchBoxes.push(expandedStretchEraseBox(document, job.boxes[index]));
             }
+            var singleSidedRegions = 0;
             for (index = 0; index < stretchBoxes.length; index += 1) {
-                createStretchPatch(
+                var stretchResult = createStretchPatch(
                     document,
                     sourceLayer,
                     root,
@@ -1806,6 +1927,7 @@ XinyangHostModules.ocrHost = function (deps) {
                     job.mode,
                     stretchBoxes
                 );
+                if (stretchResult.samples < 2) singleSidedRegions += 1;
             }
             if (!root.layers.length) {
                 try {
@@ -1814,6 +1936,7 @@ XinyangHostModules.ocrHost = function (deps) {
                 throw new Error("没有生成可用的拉伸修复补片");
             }
             var merged = root.merge();
+            softenStretchEdges(document, merged, stretchBoxes);
             merged.name = (job.mode === "horizontal"
                 ? "原文字擦除_横向拉伸_"
                 : "原文字擦除_纵向拉伸_") +
@@ -1823,7 +1946,9 @@ XinyangHostModules.ocrHost = function (deps) {
             job.result = {
                 layers: 1,
                 layerId: merged.id,
-                mode: job.mode
+                mode: job.mode,
+                processedRegions: stretchBoxes.length,
+                singleSidedRegions: singleSidedRegions
             };
             selectLayersByIds(job.restoreLayerIds && job.restoreLayerIds.length ? job.restoreLayerIds : job.textLayerIds);
         }

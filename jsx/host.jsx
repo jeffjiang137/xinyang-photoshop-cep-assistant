@@ -1,4 +1,4 @@
-/* 鑫洋助理 - Photoshop ExtendScript 主机层 */
+﻿/* 鑫洋助理 - Photoshop ExtendScript 主机层 */
 var XinyangHostLoadStage = "host-start";
 try {
 var XinyangHostModules = {};
@@ -1097,6 +1097,30 @@ var LongStitchCEP = (function () {
     var toolsEmbedSelectedLayersToGroup = lazyHostMethod(getEmbedImportModule, "toolsEmbedSelectedLayersToGroup");
     var toolsImportImages = lazyHostMethod(getEmbedImportModule, "toolsImportImages");
 
+    var libraryAssetsModule = null;
+    function getLibraryAssetsModule() {
+        if (!libraryAssetsModule) {
+            libraryAssetsModule = ensureHostBusinessFactory("libraryAssets", "modules/library/assets.jsx")({
+                pixels: pixels,
+                selectedLayerIds: selectedLayerIds,
+                selectLayersByIds: selectLayersByIds,
+                findOpenDocument: findOpenDocument,
+                suspendToolsHistory: suspendToolsHistory,
+                currentDocumentId: currentDocumentId,
+                toolGroupCurrentLayerSelection: toolGroupCurrentLayerSelection
+            });
+        }
+        return libraryAssetsModule;
+    }
+    var toolsLibraryChooseFolder = lazyHostMethod(getLibraryAssetsModule, "toolsLibraryChooseFolder");
+    var toolsLibraryChooseFiles = lazyHostMethod(getLibraryAssetsModule, "toolsLibraryChooseFiles");
+    var toolsLibraryChooseSave = lazyHostMethod(getLibraryAssetsModule, "toolsLibraryChooseSave");
+    var toolsLibraryReveal = lazyHostMethod(getLibraryAssetsModule, "toolsLibraryReveal");
+    var toolsLibraryOpenAsset = lazyHostMethod(getLibraryAssetsModule, "toolsLibraryOpenAsset");
+    var toolsLibraryExportInfo = lazyHostMethod(getLibraryAssetsModule, "toolsLibraryExportInfo");
+    var toolsLibraryExportAsset = lazyHostMethod(getLibraryAssetsModule, "toolsLibraryExportAsset");
+    var toolsLibraryThumbnail = lazyHostMethod(getLibraryAssetsModule, "toolsLibraryThumbnail");
+
     var fileExportModule = null;
     function getFileExportModule() {
         if (!fileExportModule) {
@@ -1303,6 +1327,14 @@ var LongStitchCEP = (function () {
         return browserExportModule;
     }
     var toolsExportToBrowser = lazyHostMethod(getBrowserExportModule, "toolsExportToBrowser");
+    var cutoutModule = null;
+    function getCutoutModule() {
+        if (!cutoutModule) cutoutModule = ensureHostBusinessFactory("cutout", "modules/tools/cutout.jsx")({currentDocumentIdFor: currentDocumentIdFor, findLayerById: findLayerById});
+        return cutoutModule;
+    }
+    var toolsApplyCutout = lazyHostMethod(getCutoutModule, "toolsApplyCutout");
+    function toolsRunCutout() { return getCutoutModule().run(); }
+
     var exportSelectedLayerForOCR = lazyHostMethod(getOcrHostModule, "exportSelectedLayerForOCR");
     var runTextJob = lazyHostMethod(getOcrHostModule, "runTextJob");
     var createEditableTextLayers = lazyHostMethod(getOcrHostModule, "createEditableTextLayers");
@@ -1362,6 +1394,14 @@ var LongStitchCEP = (function () {
 
     XinyangHostLoadStage = "method-table-init";
     var methods = {
+        toolsLibraryChooseFolder: toolsLibraryChooseFolder,
+        toolsLibraryChooseFiles: toolsLibraryChooseFiles,
+        toolsLibraryChooseSave: toolsLibraryChooseSave,
+        toolsLibraryReveal: toolsLibraryReveal,
+        toolsLibraryOpenAsset: toolsLibraryOpenAsset,
+        toolsLibraryExportInfo: toolsLibraryExportInfo,
+        toolsLibraryExportAsset: toolsLibraryExportAsset,
+        toolsLibraryThumbnail: toolsLibraryThumbnail,
         toolsBridgeExecute: toolsBridgeExecute,
         getDiagnosticInfo: getDiagnosticInfo,
         GuideGuide: GuideGuide,
@@ -1389,6 +1429,8 @@ var LongStitchCEP = (function () {
         applyLayerSpacing: applyLayerSpacing,
         inspectImageWidth: inspectImageWidth,
         toolsExportToBrowser: toolsExportToBrowser,
+        toolsApplyCutout: toolsApplyCutout,
+        toolsRunCutout: toolsRunCutout,
         exportSelectedLayerForOCR: exportSelectedLayerForOCR,
         createEditableTextLayers: createEditableTextLayers,
         selectedTextEraseRegions: selectedTextEraseRegions,
@@ -1518,13 +1560,14 @@ var LongStitchCEP = (function () {
     }
 
     return {
-        version: "2.3.20",
+        version: "2.3.72",
         invoke: invoke,
         _runActiveJob: runActiveJob,
         _runSliceJob: runSliceJob,
         _runSpacingJob: runSpacingJob,
         _runTextJob: runTextJob,
         _runEraseJob: runEraseJob,
+        toolsRunCutout: toolsRunCutout,
         _runToolsJob: runToolsJob
     };
 }());

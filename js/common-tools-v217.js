@@ -1093,6 +1093,8 @@
         status("已向浏览器粘贴图片，请检查对话附件；未自动提交。若未出现，请点输入框后按 Ctrl+V。");
       }).catch(function (error) {
         status("发送到浏览器失败：" + errorText(error));
+        var statusNode = one("#status-text");
+        if (statusNode) statusNode.title = "发送到浏览器失败：" + errorText(error);
       }).then(function () { setBusy(false); });
     }
     else if (action === "distribute") openDetail("distribute", sourceNode);

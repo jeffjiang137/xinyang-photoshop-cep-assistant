@@ -1,0 +1,7 @@
+V2.3.71 快速/精细抠图
+修改：index.html、css/ui-refinement.css、js/modules/cutout/panel.js、tests/cutout-client.test.js；runtime/diagnostics/host/manifest仅版本对齐。
+新增独立快速/精细切换，默认fast、localStorage独立记忆；PNG/蒙版不变。单图和批量均发送multipart mode；省略options仍沿用旧image请求。高精输出跳过既有alpha拉伸，保留服务精细边缘。不实现trimap/output可选高级参数，不改变服务全局设置，不做缓存。
+防重复：沿用busy锁，任务期间禁用全部模式按钮；高精失败不重试fast，批量逐项报错且显示错误状态。
+验证：node语法、HTTP VM请求测试含字段省略/fast/high/非法模式/503。未与开发中的ViTMatte服务联调，不宣称精细效果验收。
+人工待验：重载模式记忆、PNG与蒙版独立、窄面板布局；高精模型缺失显示失败；单图/批量回填和一次撤销。
+风险：旧服务可能忽略mode，真实精细推理须服务端实现并联调；本阶段不推断服务器实际执行的模型。

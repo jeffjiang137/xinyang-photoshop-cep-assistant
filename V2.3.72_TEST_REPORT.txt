@@ -1,0 +1,4 @@
+V2.3.72 精细模式能力检查
+当前图片和批量均先调用health，检查ok/modelAvailable；high额外要求modes包含high且vitmatteAvailable严格为true。旧服务/字段缺失/模型缺失在POST前失败。429显示服务正忙；无fast降级逻辑。
+测试：模拟旧health、无high、模型false/字段缺失、能力完整、429；既有请求兼容性和503/非PNG回归。语法通过。
+未完成：真实ViTMatte精细联调，未宣称效果验收。快速模式仍兼容旧health。

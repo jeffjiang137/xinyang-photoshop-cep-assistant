@@ -352,10 +352,33 @@ var XinyangSliceExportV2193 = (function () {
         }
     }
 
+    // Strip excluded content only in the disposable export copy, before crop/ungroup.
+    function removeHiddenExportLayers(source, target) {
+        var index;
+        for (index = source.layers.length - 1; index >= 0; index -= 1) {
+            var original = source.layers[index];
+            var layer = target.layers[index];
+            if (!original.visible) {
+                // A hidden clipping base also hides the clipped chain above it.
+                var clipped = index - 1;
+                while (clipped >= 0 && source.layers[clipped].grouped) clipped -= 1;
+                var removeIndex;
+                for (removeIndex = index; removeIndex > clipped; removeIndex -= 1) {
+                    var excluded = target.layers[removeIndex];
+                    try { excluded.allLocked = false; } catch (ignoreUnlockExport) {}
+                    excluded.remove();
+                }
+                index = clipped + 1;
+            } else if (original.typename === "LayerSet") {
+                removeHiddenExportLayers(original, layer);
+            }
+        }
+    }
     function duplicateForSliceExport(sourceDocument, name) {
         var temporary = sourceDocument.duplicate(name);
         try {
             copyLayerVisibility(sourceDocument, temporary);
+            removeHiddenExportLayers(sourceDocument, temporary);
         } catch (error) {
             try { temporary.close(SaveOptions.DONOTSAVECHANGES); } catch (ignoreCloseFailedDuplicate) {}
             try { app.activeDocument = sourceDocument; } catch (ignoreRestoreSource) {}
@@ -368,6 +391,32 @@ var XinyangSliceExportV2193 = (function () {
         var exportAllSlices = arguments.length > 3 && !!arguments[3];
         var prepareTemporaryDocument = arguments.length > 4 && !!arguments[4];
         var webQuality = Math.max(55, Math.min(95, Math.round(Number(quality) || 82)));
+        // Large PSB canvases must bypass Save for Web. Prepare a disposable copy.
+        if (pixels(document.width) > 8192 || pixels(document.height) > 8192) {
+            if (pixels(document.width) > 65500 || pixels(document.height) > 65500) {
+                throw new Error("长图超过 JPG 尺寸范围，请先添加参考线分段导出切片");
+            }
+            var jpegCopy = null;
+            var jpegPrevious = app.activeDocument;
+            try {
+                jpegCopy = duplicateForSliceExport(document, "__长图JPG导出__");
+                app.activeDocument = jpegCopy;
+                if (jpegCopy.mode !== DocumentMode.RGB) jpegCopy.changeMode(ChangeMode.RGB);
+                jpegCopy.bitsPerChannel = BitsPerChannelType.EIGHT;
+                fillDocumentWhite(jpegCopy);
+                try { jpegCopy.convertProfile("sRGB IEC61966-2.1", Intent.RELATIVECOLORIMETRIC, true, false); } catch (ignoreLongProfile) {}
+                var jpegOptions = new JPEGSaveOptions();
+                jpegOptions.quality = Math.max(0, Math.min(12, Math.round(webQuality * 12 / 100)));
+                jpegOptions.embedColorProfile = false;
+                jpegCopy.saveAs(outputFile, jpegOptions, true, Extension.LOWERCASE);
+                if (!outputFile.exists || outputFile.length <= 0) throw new Error("长图 JPG 未成功保存");
+            } finally {
+                if (jpegCopy) { try { jpegCopy.close(SaveOptions.DONOTSAVECHANGES); } catch (ignoreLongClose) {} }
+                try { app.activeDocument = jpegPrevious; } catch (ignoreLongRestore) {}
+            }
+            return;
+        }
+
         /* 当前用户文档只读导出，绝不在导出中改模式、扁平化或转换配置文件。 */
         if (prepareTemporaryDocument) {
             try { if (document.mode !== DocumentMode.RGB) document.changeMode(ChangeMode.RGB); } catch (ignoreSliceWebMode) {}

@@ -1,4 +1,4 @@
-#target photoshop
+﻿#target photoshop
 #targetengine "xinyangTextButtonV2250"
 
 /*
@@ -19,14 +19,30 @@ var XinyangTextButtonV2250 = $.global.XinyangTextButtonV2250 = (function () {
         var value = layer.bounds;
         return { left:pixel(value[0]), top:pixel(value[1]), right:pixel(value[2]), bottom:pixel(value[3]) };
     }
-    function findLayer(parent, id) {
-        var index, layer, result;
-        for (index = 0; index < parent.layers.length; index += 1) {
-            layer = parent.layers[index];
-            try { if (Number(layer.id) === Number(id)) return layer; } catch (ignoreId) {}
-            if (layer.typename === "LayerSet") { result = findLayer(layer, id); if (result) return result; }
-        }
-        return null;
+    function selectId(id, add) {
+        var descriptor = new ActionDescriptor(), reference = new ActionReference();
+        reference.putIdentifier(charIDToTypeID("Lyr "), Number(id));
+        descriptor.putReference(charIDToTypeID("null"), reference);
+        descriptor.putBoolean(stringIDToTypeID("makeVisible"), false);
+        if (add) descriptor.putEnumerated(stringIDToTypeID("selectionModifier"), stringIDToTypeID("selectionModifierType"), stringIDToTypeID("addToSelection"));
+        executeAction(charIDToTypeID("slct"), descriptor, DialogModes.NO);
+    }
+    function adjacentBackground(document, textLayer) {
+        var reference = new ActionReference(), descriptor, position;
+        reference.putIdentifier(charIDToTypeID("Lyr "), Number(textLayer.id));
+        descriptor = executeActionGet(reference);
+        position = descriptor.getInteger(stringIDToTypeID("itemIndex"));
+        // AM indices omit the background layer offset when there is no background.
+        try { document.backgroundLayer; } catch (ignoreNoBackground) { position -= 1; }
+        if (position < 1) return [];
+        reference = new ActionReference();
+        reference.putIndex(charIDToTypeID("Lyr "), position - 1);
+        try {
+            descriptor = executeActionGet(reference);
+            if (descriptor.getString(stringIDToTypeID("name")).indexOf(marker(textLayer)) !== 0) return [];
+            selectId(descriptor.getInteger(stringIDToTypeID("layerID")), false);
+            return [document.activeLayer];
+        } catch (ignoreAdjacent) { return []; }
     }
     function selectedTextLayers(document) {
         var ids = [], output = [], property, reference, descriptor, list, index, layer;
@@ -50,20 +66,13 @@ var XinyangTextButtonV2250 = $.global.XinyangTextButtonV2250 = (function () {
         } catch (ignoreMulti) {}
         if (!ids.length) return [document.activeLayer];
         for (index = 0; index < ids.length; index += 1) {
-            layer = findLayer(document, ids[index]);
+            selectId(ids[index], false);
+            layer = document.activeLayer;
             if (layer) output.push(layer);
         }
         return output.length ? output : [document.activeLayer];
     }
     function marker(layer) { return "__XYBTN__" + Number(layer.id) + "__"; }
-    function removeOld(parent, prefix) {
-        var index, layer;
-        for (index = parent.layers.length - 1; index >= 0; index -= 1) {
-            layer = parent.layers[index];
-            if (String(layer.name || "").indexOf(prefix) === 0) { try { layer.remove(); } catch (ignoreRemove) {} }
-            else if (layer.typename === "LayerSet") removeOld(layer, prefix);
-        }
-    }
     function pad(value, fontSize) {
         var text = String(value || "28,12").replace(/\s/g, ""), values, level;
         if (text.indexOf("auto:") === 0) {
@@ -115,26 +124,38 @@ var XinyangTextButtonV2250 = $.global.XinyangTextButtonV2250 = (function () {
         var value = new SolidColor(), source = border ? rgb(hex) : { red:255, green:255, blue:255 };
         value.rgb.red = source.red; value.rgb.green = source.green; value.rgb.blue = source.blue; layer.textItem.color = value;
     }
-    function draw(document, textLayer, options) {
+    function draw(document, textLayer, options, oldBackgrounds) {
         var textBox = layerBounds(textLayer), fontSize = 24, paddingValue, box, radius, background;
         if (!(textBox.right > textBox.left && textBox.bottom > textBox.top)) throw new Error("选中的文字图层没有有效边界");
         try { fontSize = Number(textLayer.textItem.size.as("px")) || 24; } catch (ignoreSize) {}
         paddingValue = pad(options.padding, fontSize);
         box = { left:textBox.left-paddingValue.x, top:textBox.top-paddingValue.y, right:textBox.right+paddingValue.x, bottom:textBox.bottom+paddingValue.y };
         radius = options.type === "1" ? 0 : Math.max(0, Math.min((box.right-box.left)/2, (box.bottom-box.top)/2, (box.bottom-box.top)/2));
-        removeOld(document, marker(textLayer));
+        var oldIndex;
+        document.activeLayer = textLayer;
         background = createLiveRectangle(document, box, radius, options.color, !!options.isBorder);
         background.name = marker(textLayer) + (options.isBorder ? "border vector" : "fill vector");
         setTextColor(textLayer, options.color, !!options.isBorder);
         background.move(textLayer, ElementPlacement.PLACEAFTER);
+        // Keep the previous background until its replacement is successfully built.
+        for (oldIndex = 0; oldIndex < oldBackgrounds.length; oldIndex += 1) oldBackgrounds[oldIndex].remove();
     }
     function invoke(payload) {
         try {
             if (!app.documents.length) throw new Error("请先打开文档并选择文字图层");
-            var document = app.activeDocument, options = read(payload), layers = selectedTextLayers(document), index, processed = 0;
+            var document = app.activeDocument, options = read(payload);
+            var layers = selectedTextLayers(document), index, processed = 0;
+            $.global.__xinyangButtonRun = function () {
             for (index = 0; index < layers.length; index += 1) {
-                if (layers[index] && layers[index].typename === "ArtLayer" && layers[index].kind === LayerKind.TEXT) { draw(document, layers[index], options); processed += 1; }
+                if (layers[index] && layers[index].typename === "ArtLayer" && layers[index].kind === LayerKind.TEXT) { draw(document, layers[index], options, adjacentBackground(document, layers[index])); processed += 1; }
             }
+            };
+            try {
+                document.suspendHistory("鑫洋助理：生成按钮背景", "$.global.__xinyangButtonRun()");
+            } finally {
+                delete $.global.__xinyangButtonRun;
+            }
+            for (index = 0; index < layers.length; index += 1) selectId(layers[index].id, index > 0);
             if (!processed) throw new Error("当前选择中没有文字图层");
             return response(true, { processed:processed, created:processed });
         } catch (error) { return response(false, null, error && error.message ? error.message : String(error)); }

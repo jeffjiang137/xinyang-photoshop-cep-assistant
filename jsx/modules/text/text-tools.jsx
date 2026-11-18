@@ -31,6 +31,12 @@ XinyangHostModules.textTools = function (deps) {
     var toolSolidColorHex = deps.toolSolidColorHex;
     var toolTextFormattingLayers = deps.toolTextFormattingLayers;
 
+    function toolTypographySelectionSignature(document, ids, activeId) {
+        var sorted = ids.slice(0);
+        sorted.sort(function (a, b) { return Number(a) - Number(b); });
+        return String(document.id) + "|" + String(activeId) + "|" + sorted.join(",");
+    }
+
     function toolsGetFonts(options) {
         options = options || {};
         var collection = app.fonts;
@@ -150,6 +156,13 @@ XinyangHostModules.textTools = function (deps) {
         var ids = selectedLayerIds();
         if (!ids.length) throw new Error("请先选择需要排版的文字图层");
         options = options || {};
+        if (options.expectedSelectionSignature) {
+            var currentActiveId;
+            try { currentActiveId = Number(document.activeLayer.id); } catch (ignoreActiveId) { currentActiveId = activeLayerId(); }
+            if (String(options.expectedSelectionSignature) !== toolTypographySelectionSignature(document, ids, currentActiveId)) {
+                throw new Error("文字选择已改变，请重新调整属性");
+            }
+        }
 
         function hasOption(name) {
             try { return options.hasOwnProperty(name); } catch (ignoreHasOption) {}
@@ -254,6 +267,12 @@ XinyangHostModules.textTools = function (deps) {
                     skipped += 1;
                     continue;
                 }
+                var lockOwner = layer, locked = false;
+                while (lockOwner && lockOwner.typename !== "Document") {
+                    try { if (lockOwner.allLocked) { locked = true; break; } } catch (ignoreLockState) {}
+                    try { lockOwner = lockOwner.parent; } catch (ignoreLockParent) { break; }
+                }
+                if (locked) { skipped += 1; continue; }
                 var item = layer.textItem;
                 if (!applyCharacterStyle(layer, item)) {
                     if (applyFont) {
@@ -486,44 +505,131 @@ XinyangHostModules.textTools = function (deps) {
      * 一并返回样式；多选时保留 selection 信息，避免 UI 再发起第二次读取。
      */
     function toolsGetTypographySnapshot() {
-        var started = (new Date()).getTime(), parseStarted, mixedStarted;
-        var ids = selectedLayerIds(), activeId = -1, index, record, base = null;
-        var actionGets = 1, allText = ids.length > 0, parseMs = 0, mixedMs = 0;
-        try { activeId = activeLayerId(); actionGets += 1; } catch (ignoreActiveId) {}
-        var fields = { font:{mixed:false,value:null}, size:{mixed:false,value:null}, tracking:{mixed:false,value:null}, leading:{mixed:false,value:null}, alignment:{mixed:false,value:null}, color:{mixed:false,value:null} };
+        var started = new Date().getTime(), parseStarted, mixedStarted;
+        var document = app.documents.length ? app.activeDocument : null;
+        var ids = document ? selectedLayerIds() : [], activeId = -1;
+        var actionGets = document ? 1 : 0, allText = ids.length > 0;
+        var parseMs = 0, mixedMs = 0, base = null, index;
+        var names = ["font", "size", "tracking", "leading", "alignment", "color",
+            "fauxBold", "fauxItalic", "allCaps", "opticalKern"];
+        var fields = {}, fieldIndex;
+        for (fieldIndex = 0; fieldIndex < names.length; fieldIndex += 1) {
+            fields[names[fieldIndex]] = {mixed:false, value:null};
+        }
+        if (document) {
+            try { activeId = Number(document.activeLayer.id); }
+            catch (ignoreActiveLayerId) { try { activeId = activeLayerId(); actionGets += 1; } catch (ignoreNoActiveId) {} }
+        }
         function key(name) { return stringIDToTypeID(name); }
-        function value(d, name, fallback) { try { return d.getUnitDoubleValue(key(name)); } catch (ignoreUnit) { try { return d.getDouble(key(name)); } catch (ignoreDouble) { try { return d.getInteger(key(name)); } catch (ignoreInteger) { return fallback; } } } }
-        function textRecord(id, need) {
-            var ref = new ActionReference(), layer, text, styleRange, style, paragraphRange, paragraph, color, result;
-            ref.putIdentifier(charIDToTypeID("Lyr "), id); layer = executeActionGet(ref); actionGets += 1;
-            /* 只用 textKey 的存在性判断文字层；绝不切换 activeLayer。 */
-            try { text = layer.getObjectValue(key("textKey")); } catch (ignoreNotText) { return null; }
-            /* 六个字段都已经确认 mixed 后，不再解析 textStyle/paragraphStyle。 */
-            if (!need.font && !need.size && !need.tracking && !need.leading && !need.alignment && !need.color) return {};
-            try { styleRange = text.getList(key("textStyleRange")).getObjectValue(0); style = styleRange.getObjectValue(key("textStyle")); } catch (ignoreStyle) { return null; }
-            result = {};
-            if (need.font) try { result.font = String(style.getString(key("fontPostScriptName"))); } catch (ignoreFont) { result.font=""; }
-            if (need.size) result.size=value(style,"size",0);
-            if (need.tracking) result.tracking=value(style,"tracking",0);
-            if (need.leading) result.leading=value(style,"leading",0);
-            if (need.color) try { color = style.getObjectValue(key("color")); var rr=Math.round(color.getDouble(charIDToTypeID("Rd  "))),gg=Math.round(color.getDouble(charIDToTypeID("Grn "))),bb=Math.round(color.getDouble(charIDToTypeID("Bl  "))); function hx(n){var s=Math.max(0,Math.min(255,n)).toString(16);return s.length<2?"0"+s:s;} result.color = "#" + hx(rr) + hx(gg) + hx(bb); } catch (ignoreColor) { result.color=""; }
-            if (need.alignment) try { paragraphRange = text.getList(key("paragraphStyleRange")).getObjectValue(0); paragraph = paragraphRange.getObjectValue(key("paragraphStyle")); result.alignment = String(typeIDToStringID(paragraph.getEnumerationValue(key("align"))) || "left"); } catch (ignoreAlign) { result.alignment="left"; }
+        function numberValue(d, name, fallback) {
+            try { if (!d.hasKey(key(name))) return fallback; } catch (ignoreHasNumber) { return fallback; }
+            try { return d.getUnitDoubleValue(key(name)); } catch (ignoreUnit) {}
+            try { return d.getDouble(key(name)); } catch (ignoreDouble) {}
+            try { return d.getInteger(key(name)); } catch (ignoreInteger) { return fallback; }
+        }
+        function stringValue(d, name, fallback) {
+            try { return d.hasKey(key(name)) ? String(d.getString(key(name))) : fallback; } catch (ignoreString) { return fallback; }
+        }
+        function boolValue(d, name, fallback) {
+            try { return d.hasKey(key(name)) ? !!d.getBoolean(key(name)) : fallback; } catch (ignoreBoolean) { return fallback; }
+        }
+        function enumValue(d, name, fallback) {
+            try { return d.hasKey(key(name)) ? String(typeIDToStringID(d.getEnumerationValue(key(name)))) : fallback; } catch (ignoreEnum) { return fallback; }
+        }
+        function colorValue(style, fallback) {
+            try {
+                if (!style.hasKey(key("color"))) return fallback;
+                var color = style.getObjectValue(key("color"));
+                function hex(name) {
+                    var value = Math.max(0, Math.min(255, Math.round(color.getDouble(charIDToTypeID(name))))).toString(16);
+                    return value.length < 2 ? "0" + value : value;
+                }
+                return "#" + hex("Rd  ") + hex("Grn ") + hex("Bl  ");
+            } catch (ignoreColor) { return fallback; }
+        }
+        function merge(name, value) {
+            if (fields[name].mixed) return;
+            if (fields[name].value === null) fields[name].value = value;
+            else if (fields[name].value !== value) { fields[name].mixed = true; fields[name].value = null; }
+        }
+        function textRecord(id) {
+            var ref = new ActionReference(), layer, text, ranges, range, style;
+            var result = null, current, rangeIndex, paragraphs, paragraph, alignment;
+            // Fetch only textKey, not masks/effects/bounds and the full layer descriptor.
+            ref.putProperty(key("property"), key("textKey"));
+            ref.putIdentifier(charIDToTypeID("Lyr "), id);
+            actionGets += 1;
+            try { layer = executeActionGet(ref); text = layer.getObjectValue(key("textKey")); }
+            catch (ignoreNotText) { return null; }
+            try { ranges = text.getList(key("textStyleRange")); } catch (ignoreStyleRanges) { return null; }
+            var contents = stringValue(text, "textKey", "");
+            for (rangeIndex = 0; rangeIndex < ranges.count; rangeIndex += 1) {
+                range = ranges.getObjectValue(rangeIndex);
+                if (rangeIndex > 0 && contents.length && numberValue(range, "from", 0) >= contents.length) continue;
+                try { style = range.getObjectValue(key("textStyle")); } catch (ignoreRangeStyle) { continue; }
+                var inherited = result || {};
+                var size = numberValue(style, "size", inherited.size || 0);
+                var autoLeading = boolValue(style, "autoLeading", inherited.useAutoLeading === undefined ? true : inherited.useAutoLeading);
+                current = {
+                    font:stringValue(style, "fontPostScriptName", inherited.font || ""),
+                    family:stringValue(style, "fontName", inherited.family || ""),
+                    fontStyle:stringValue(style, "fontStyleName", inherited.fontStyle || ""),
+                    size:size,
+                    tracking:numberValue(style, "tracking", inherited.tracking || 0),
+                    leading:autoLeading ? size * 1.2 : numberValue(style, "leading", inherited.leading || size * 1.2),
+                    useAutoLeading:autoLeading,
+                    color:colorValue(style, inherited.color || ""),
+                    fauxBold:boolValue(style, "syntheticBold", !!inherited.fauxBold),
+                    fauxItalic:boolValue(style, "syntheticItalic", !!inherited.fauxItalic),
+                    allCaps:enumValue(style, "fontCaps", inherited.allCaps ? "allCaps" : "normal") === "allCaps",
+                    opticalKern:enumValue(style, "autoKern", inherited.opticalKern ? "opticalKern" : "metricsKern") === "opticalKern"
+                };
+                if (!result) result = current;
+                for (fieldIndex = 0; fieldIndex < names.length; fieldIndex += 1) {
+                    if (names[fieldIndex] !== "alignment") merge(names[fieldIndex], current[names[fieldIndex]]);
+                }
+            }
+            if (!result) return null;
+            result.direction = enumValue(text, "orientation", "horizontal");
+            result.alignment = "left";
+            try {
+                paragraphs = text.getList(key("paragraphStyleRange"));
+                for (rangeIndex = 0; rangeIndex < paragraphs.count; rangeIndex += 1) {
+                    range = paragraphs.getObjectValue(rangeIndex);
+                    if (rangeIndex > 0 && contents.length && numberValue(range, "from", 0) >= contents.length) continue;
+                    paragraph = range.getObjectValue(key("paragraphStyle"));
+                    alignment = enumValue(paragraph, "align", result.alignment);
+                    if (rangeIndex === 0) result.alignment = alignment;
+                    merge("alignment", alignment);
+                }
+            } catch (ignoreParagraph) { merge("alignment", result.alignment); }
             return result;
         }
-        function compare(name, current) { if (current !== undefined && !fields[name].mixed && fields[name].value !== current) { fields[name].mixed = true; fields[name].value = null; } }
         for (index = 0; index < ids.length; index += 1) {
-            parseStarted = (new Date()).getTime();
-            record = textRecord(ids[index], {font:index===0||!fields.font.mixed,size:index===0||!fields.size.mixed,tracking:index===0||!fields.tracking.mixed,leading:index===0||!fields.leading.mixed,alignment:index===0||!fields.alignment.mixed,color:index===0||!fields.color.mixed});
-            parseMs += (new Date()).getTime() - parseStarted;
+            parseStarted = new Date().getTime();
+            var record = textRecord(ids[index]);
+            parseMs += new Date().getTime() - parseStarted;
             if (!record) { allText = false; break; }
-            if (!base) { base = record; fields.font.value=record.font; fields.size.value=record.size; fields.tracking.value=record.tracking; fields.leading.value=record.leading; fields.alignment.value=record.alignment; fields.color.value=record.color; }
-            else {
-                mixedStarted = (new Date()).getTime();
-                compare("font",record.font); compare("size",record.size); compare("tracking",record.tracking); compare("leading",record.leading); compare("alignment",record.alignment); compare("color",record.color);
-                mixedMs += (new Date()).getTime() - mixedStarted;
-            }
+            if (!base || ids[index] === activeId) base = record;
         }
-        return { selectionCount:ids.length, selectedCount:ids.length, selectedLayerIds:ids, activeLayerId:activeId, activeIsText:allText && !!base, allTextLayers:allText, signature:String(activeId)+"|"+ids.join(","), font:fields.font, size:fields.size, tracking:fields.tracking, leading:fields.leading, alignment:fields.alignment, color:fields.color, style:base ? {font:fields.font.value || base.font,size:fields.size.value,tracking:fields.tracking.value,leading:fields.leading.value,align:fields.alignment.value || base.alignment,color:fields.color.value || base.color,fauxBold:false,fauxItalic:false,allCaps:false,opticalKern:false,direction:"horizontal"} : null, performance:{selectionCount:ids.length,snapshotDuration:(new Date()).getTime()-started,executeActionGetCount:actionGets,descriptorParseDuration:parseMs,mixedCalculationDuration:mixedMs} };
+        var result = {
+            selectionCount:ids.length, selectedCount:ids.length, selectedLayerIds:ids,
+            activeLayerId:activeId, activeIsText:allText && !!base, allTextLayers:allText,
+            signature:document ? toolTypographySelectionSignature(document, ids, activeId) : "none",
+            family:base ? base.family : "", fontStyle:base ? base.fontStyle : "",
+            style:null,
+            performance:{selectionCount:ids.length, snapshotDuration:new Date().getTime()-started,
+                executeActionGetCount:actionGets, descriptorParseDuration:parseMs, mixedCalculationDuration:mixedMs}
+        };
+        for (fieldIndex = 0; fieldIndex < names.length; fieldIndex += 1) result[names[fieldIndex]] = fields[names[fieldIndex]];
+        if (base) {
+            result.style = {font:fields.font.value || base.font, size:fields.size.value,
+                tracking:fields.tracking.value, leading:fields.leading.value,
+                align:fields.alignment.value || base.alignment, color:fields.color.value || base.color,
+                fauxBold:base.fauxBold, fauxItalic:base.fauxItalic, allCaps:base.allCaps,
+                opticalKern:base.opticalKern, direction:base.direction, useAutoLeading:base.useAutoLeading};
+        }
+        return result;
     }
 
     function toolsGetSelectedTextContents() {
@@ -1123,6 +1229,16 @@ XinyangHostModules.textTools = function (deps) {
             if (action !== "mergeLines" && action !== "mergeParagraph") {
                 throw new Error("未知文字操作");
             }
+            /* 单个段落文本原位转为点文本，保留内容、样式和图层关系。 */
+            if (action === "mergeParagraph" && layers.length === 1 &&
+                    layers[0].textItem.kind === TextType.PARAGRAPHTEXT) {
+                layers[0].textItem.kind = TextType.POINTTEXT;
+                if (layers[0].textItem.kind !== TextType.POINTTEXT) {
+                    throw new Error("Photoshop 未能将段落文本转换为点文本");
+                }
+                selectLayersByIds([toolLayerId(document, layers[0])]);
+                return { processed: 1, created: 0, removed: 0, preserved: 1 };
+            }
             /* 合并多行需要至少两层；单层也允许直接转换为段落文本。 */
             if (action === "mergeLines" && layers.length < 2) {
                 throw new Error("合并多行至少需要选择两个文字图层");
@@ -1452,8 +1568,15 @@ XinyangHostModules.textTools = function (deps) {
             for (index = 0; index < layers.length; index += 1) {
                 var textLayer = layers[index];
                 if (!textLayer || textLayer.typename !== "ArtLayer" || textLayer.kind !== LayerKind.TEXT) continue;
-                var style = toolReadTextStyle(textLayer);
-                var padding = paddingRule ? toolParseButtonPadding(paddingRule, style.size || 24) : { x: legacyPaddingX, y: legacyPaddingY };
+                var fontSize = 24;
+                if (/^(auto:|自动生成)/.test(paddingRule.replace(/\s+/g, ""))) {
+                    try { fontSize = Number(textLayer.textItem.size.as("pt")) || 24; }
+                    catch (ignoreButtonSize) {
+                        try { fontSize = Number(textLayer.textItem.size) || 24; }
+                        catch (ignoreRawButtonSize) {}
+                    }
+                }
+                var padding = paddingRule ? toolParseButtonPadding(paddingRule, fontSize) : { x: legacyPaddingX, y: legacyPaddingY };
                 var visual = toolLayerVisualBounds(textLayer);
                 if (!(visual.right > visual.left && visual.bottom > visual.top)) throw new Error("文字图层“" + textLayer.name + "”没有可用边界");
                 var bounds = { left: visual.left-padding.x, top: visual.top-padding.y, right: visual.right+padding.x, bottom: visual.bottom+padding.y };
@@ -1478,8 +1601,10 @@ XinyangHostModules.textTools = function (deps) {
                     background.name = toolButtonMarker(textLayer) + (isBorder ? "border button" : "fill button");
                     created += 1;
                 }
-                var appearanceResult = toolApplyTextButtonAppearance(background, textLayer, bounds, actualRadius, colorValue, isBorder);
-                if (!appearanceResult.geometryUpdated) geometryFallbacks += 1;
+                // The raster fill already uses the target bounds. Resizing it again resamples the edges.
+                toolSetButtonTextColor(textLayer, isBorder, colorValue);
+                try { background.move(textLayer, ElementPlacement.PLACEAFTER); } catch (ignoreMoveButtonBelow) {}
+                geometryFallbacks += 1;
                 selectedTextIds.push(layerNumericId(textLayer));
             }
             if (!selectedTextIds.length) throw new Error("没有成功创建或更新按钮背景");

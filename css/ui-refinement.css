@@ -1,0 +1,420 @@
+/* Compact property-panel finish. Loaded after the feature styles; no layout or
+   visibility rules for embedded guides, dialogs, or document content. */
+:root {
+  --ui-section-line: #343a43;
+  --ui-shadow-float: 0 8px 24px rgba(0, 0, 0, .28);
+  --ui-focus-ring: 0 0 0 2px rgba(128, 170, 255, .24);
+}
+
+body {
+  font-family: "Source Han Sans CN", "思源黑体 CN", "Noto Sans CJK SC", "Segoe UI", sans-serif;
+  letter-spacing: 0;
+}
+
+/* A quiet navigation rail, with the same optical size for every tool. */
+.panel-nav { background: var(--ui-nav) !important; }
+.nav-button { box-shadow: none !important; }
+.nav-main-icon {
+  width: 20px !important;
+  height: 20px !important;
+  opacity: .86 !important;
+  filter: none !important;
+  transform: none !important;
+}
+.nav-button:hover .nav-main-icon,
+.nav-button.active .nav-main-icon { opacity: 1 !important; }
+.nav-button:focus {
+  outline: 2px solid var(--ui-border-focus) !important;
+  outline-offset: -2px;
+}
+
+.ui-page-header,
+.panel-title-row,
+.words-panel-header,
+.common-tools-title {
+  background: var(--ui-nav) !important;
+  box-shadow: none !important;
+}
+.ui-page-heading > span { color: var(--ui-text-3) !important; }
+.ui-section-kicker > span { color: var(--ui-text-2); }
+.ui-section-kicker > small { color: var(--ui-text-3); }
+.ui-section-kicker::after { background: var(--ui-section-line); }
+
+/* Keep nested controls light; elevation belongs to menus, not every button. */
+.tool-panel .button.secondary,
+.tool-panel .mini-button,
+.tool-panel .tuniu-wide-button,
+.tool-panel .tuniu-two-buttons button,
+.tool-panel .find-same-grid button {
+  background: var(--ui-surface-2) !important;
+  color: var(--ui-text-2);
+  box-shadow: none;
+}
+.tool-panel .button.secondary:hover:not(:disabled),
+.tool-panel .mini-button:hover:not(:disabled),
+.tool-panel .tuniu-wide-button:hover:not(:disabled),
+.tool-panel .tuniu-two-buttons button:hover:not(:disabled),
+.tool-panel .find-same-grid button:hover:not(:disabled) {
+  border-color: var(--ui-border-hover) !important;
+  background: var(--ui-surface-3) !important;
+  color: var(--ui-text);
+}
+.tool-panel .button.primary,
+.tool-panel .spacing-apply,
+.tool-panel #custom-doc-create,
+.tool-panel #recognize-text,
+.tool-panel #tool-slim-run,
+.framework-bottom button:not(:disabled),
+#bridge-panel .bridge-primary {
+  color: #101d35 !important;
+  text-shadow: none;
+}
+.tool-panel .button.primary:hover:not(:disabled),
+.tool-panel .spacing-apply:hover:not(:disabled),
+.tool-panel #custom-doc-create:hover:not(:disabled),
+.tool-panel #recognize-text:hover:not(:disabled),
+.tool-panel #tool-slim-run:hover:not(:disabled),
+.framework-bottom button:hover:not(:disabled),
+#bridge-panel .bridge-primary:hover:not(:disabled) { color: #101d35 !important; }
+
+.tool-panel button:disabled { cursor: default; }
+.tool-panel button:focus,
+.tool-panel a:focus {
+  outline: 2px solid var(--ui-border-focus);
+  outline-offset: -2px;
+}
+/* :focus remains as a fallback for older CEP Chromium. */
+.tool-panel button:focus:not(:focus-visible),
+.tool-panel a:focus:not(:focus-visible) { outline: none; }
+.tool-panel button:focus-visible,
+.tool-panel a:focus-visible {
+  outline: 2px solid var(--ui-border-focus) !important;
+  outline-offset: -2px;
+}
+
+.common-tool-icon {
+  border-color: var(--ui-border) !important;
+  border-radius: 7px !important;
+  background: var(--ui-surface-2) !important;
+  box-shadow: none !important;
+}
+.common-tool-button:hover .common-tool-icon {
+  background: var(--ui-surface-3) !important;
+  border-color: var(--ui-border-focus) !important;
+}
+.common-tool-icon img { width: 22px !important; height: 22px !important; }
+.common-tool-label { font-size: 10px !important; line-height: 16px !important; }
+
+/* Character properties: one surface per row, with seven direct weight samples. */
+#typography-panel .words-body-section {
+  padding: 8px 7px 9px !important;
+  border-color: var(--ui-border) !important;
+  background: var(--ui-surface-1) !important;
+  border-radius: var(--ui-radius-md) !important;
+}
+#typography-panel .words-font-combobox {
+  grid-template-columns: minmax(0, 1fr) 27px;
+  grid-template-rows: 30px;
+  height: 32px;
+  border: 1px solid var(--ui-border) !important;
+  border-radius: 5px !important;
+  background: var(--ui-input) !important;
+}
+#typography-panel .words-font-combobox > input {
+  height: 30px !important;
+  min-height: 30px !important;
+  max-height: 30px !important;
+  padding-left: 8px !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  font-size: 11px;
+}
+#typography-panel .words-font-combobox > .text-font-arrow {
+  height: 30px !important;
+  min-height: 30px !important;
+  max-height: 30px !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 0 4px 4px 0 !important;
+  color: var(--ui-text-2);
+  background: transparent !important;
+  box-shadow: none !important;
+}
+#typography-panel .words-font-combobox:focus-within {
+  border-color: var(--ui-border-focus) !important;
+}
+#typography-panel .words-color-compact {
+  height: 32px;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--ui-text-2);
+}
+#typography-panel .words-color-compact .words-ps-color-picker {
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 2px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+#typography-panel .words-color-compact .words-ps-color-picker > i {
+  box-shadow: none;
+}
+#typography-panel .words-color-compact .words-ps-color-picker:focus-visible {
+  outline: 2px solid var(--ui-border-focus) !important;
+  outline-offset: 2px;
+}
+#typography-panel .words-optical-kern {
+  border-color: var(--ui-border) !important;
+  background: var(--ui-input) !important;
+  color: var(--ui-text-2);
+}
+#typography-panel .words-weight-chips {
+  display: grid !important;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0 !important;
+  margin-top: 7px !important;
+  padding: 2px !important;
+  border: 0 !important;
+  border-radius: 4px;
+  background: var(--ui-surface-2);
+  scrollbar-width: thin;
+  scrollbar-color: var(--ui-border-hover) transparent;
+}
+#typography-panel .words-weight-chips button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0 !important;
+  max-width: none;
+  height: 29px !important;
+  padding: 0 !important;
+  border: 1px solid transparent !important;
+  border-radius: 2px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--ui-text-2) !important;
+}
+#typography-panel .words-weight-chips button:hover:not(:disabled) {
+  background: var(--ui-surface-3) !important;
+  color: var(--ui-text) !important;
+}
+#typography-panel .words-weight-chips button.active,
+#typography-panel .words-weight-chips button[aria-pressed="true"] {
+  border-color: #727272 !important;
+  background: #25282d !important;
+  color: var(--ui-text) !important;
+}
+#typography-panel .words-weight-chips .words-weight-sample {
+  display: inline-flex;
+  width: 100%;
+  height: 100%;
+  font-size: 18px;
+  line-height: 27px;
+}
+#typography-panel .words-weight-chips::-webkit-scrollbar { height: 3px; }
+#typography-panel .words-weight-chips::-webkit-scrollbar-track { background: transparent; }
+#typography-panel .words-weight-chips::-webkit-scrollbar-thumb {
+  border: 0;
+  border-radius: 3px;
+  background: var(--ui-border-hover);
+}
+
+#typography-panel .words-public-tools,
+#typography-panel .words-action-toolbar,
+#typography-panel .words-align-grid {
+  padding: 0 !important;
+  margin-top: 5px !important;
+  gap: 2px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+#typography-panel .words-align-grid {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  row-gap: 3px !important;
+}
+#typography-panel .words-public-tools button,
+#typography-panel .words-action-toolbar button,
+#typography-panel .words-align-grid button {
+  min-width: 0;
+  height: 28px !important;
+  min-height: 28px !important;
+  padding: 0 !important;
+  border: 1px solid transparent !important;
+  border-radius: 3px !important;
+  color: var(--ui-text-2) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+#typography-panel .words-public-tools button:hover:not(:disabled),
+#typography-panel .words-action-toolbar button:hover:not(:disabled),
+#typography-panel .words-align-grid button:hover:not(:disabled) {
+  background: var(--ui-surface-3) !important;
+  color: var(--ui-text) !important;
+}
+#typography-panel .words-public-tools button.active,
+#typography-panel .words-action-toolbar button.active,
+#typography-panel .words-align-grid button.active {
+  border-color: #5279b5 !important;
+  color: #eaf1ff !important;
+  background: #2c3b52 !important;
+}
+#typography-panel .words-public-tools .words-tool-separator {
+  height: 15px;
+  margin: 0 3px;
+  background: var(--ui-border);
+}
+#typography-panel .words-public-tools strong,
+#typography-panel .words-public-tools em {
+  font-size: 16px;
+  line-height: 1;
+}
+#typography-panel .words-public-tools .caps-icon {
+  font-size: 14px;
+  line-height: 1;
+  letter-spacing: -.5px;
+}
+#typography-panel .words-command-icon {
+  display: block;
+  width: 18px !important;
+  height: 18px !important;
+  flex: 0 0 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+#typography-panel .words-command-icon [fill="currentColor"] { fill: currentColor; }
+#typography-panel .words-command-icon [stroke="none"] { stroke: none; }
+#typography-panel .words-metric-icon .words-command-icon {
+  width: 17px !important;
+  height: 17px !important;
+  flex-basis: 17px;
+}
+#typography-panel .words-divider {
+  margin-top: 9px !important;
+  background: var(--ui-section-line) !important;
+}
+#typography-panel .words-hierarchy,
+#typography-panel .words-auto-layout-toggle,
+#typography-panel .words-auto-layout-panel {
+  border-color: var(--ui-border) !important;
+  background: var(--ui-surface-1) !important;
+  box-shadow: none !important;
+}
+#typography-panel .words-metric-control {
+  border-color: var(--ui-border) !important;
+  background: var(--ui-input) !important;
+}
+#typography-panel .words-metric-control > input[type="number"] {
+  color: var(--ui-text) !important;
+  background: transparent !important;
+  font-variant-numeric: tabular-nums;
+}
+#typography-panel .words-metric-control:focus-within {
+  border-color: var(--ui-border-focus) !important;
+  box-shadow: var(--ui-focus-ring) !important;
+}
+#typography-panel .words-metric-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ui-text-2);
+}
+.words-metric-icon img { display: block; width: 17px; height: 17px; }
+
+#typography-panel .words-font-results,
+#typography-panel .words-preset-popup,
+#typography-panel .words-inline-popover,
+#typography-panel .words-floating-menu {
+  border-color: var(--ui-border-hover) !important;
+  border-radius: 7px !important;
+  background: var(--ui-surface-2) !important;
+  box-shadow: var(--ui-shadow-float) !important;
+}
+#typography-panel .words-font-tabs,
+#typography-panel .words-font-category { border-bottom-color: var(--ui-border); }
+#typography-panel #words-font-result-list .text-font-result {
+  min-height: 30px;
+  padding: 5px 9px;
+  color: var(--ui-text-2);
+  font-size: 11px;
+  text-align: left;
+}
+#typography-panel #words-font-result-list .text-font-result:hover,
+#typography-panel #words-font-result-list .text-font-result:focus {
+  color: var(--ui-text);
+  background: var(--ui-surface-3);
+}
+
+/* Match the library shell to the rest of the extension without tinting assets. */
+#library-app { --lib-accent: #5a83e9; background: var(--ui-bg); color: var(--ui-text-2); }
+#library-app .lib-toolbar,
+#library-app .lib-footer { background: var(--ui-nav); border-color: var(--ui-border); }
+#library-app .lib-folder-toggle,
+#library-app .lib-card,
+#library-app .lib-more { background: var(--ui-surface-2); }
+#library-app input:not([type="range"]),
+#library-app select {
+  border-color: var(--ui-border) !important;
+  background: var(--ui-input) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-button,
+  .nav-main-icon,
+  .tool-panel button { transition: none !important; }
+}
+/* Stitch actions: consistent rows and a clear break before canvas settings. */
+#stitch-panel > .slice-clear-row {
+  gap: 8px;
+  margin-top: 0;
+  margin-bottom: 8px;
+}
+#stitch-panel > .ui-page-header + .slice-clear-row { margin-top: 12px; }
+#stitch-panel > .slice-clear-row .button {
+  min-height: 34px;
+  margin: 0;
+}
+#stitch-panel > .slice-clear-row + .width-selector {
+  margin-top: 16px;
+  margin-bottom: 12px;
+}
+
+/* Cutout: compact task surface, persistent two-way output control. */
+#cutout-panel .cutout-workspace { padding-top: 16px; }
+#cutout-panel .cutout-mode { display: flex; gap: 4px; padding: 4px; border: 1px solid var(--ui-border, #414141); border-radius: 9px; background: var(--ui-input, #252525); }
+#cutout-panel .cutout-mode-button { display: flex; flex: 1; min-width: 0; min-height: 42px; align-items: center; justify-content: center; gap: 9px; padding: 8px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--ui-text-2, #aaa); font: inherit; font-weight: 500; cursor: pointer; }
+#cutout-panel .cutout-mode-button:hover { background: var(--ui-surface-2, #333); color: var(--ui-text, #eee); }
+#cutout-panel .cutout-mode-button.is-active { border-color: #668dec; background: #344464; color: #f3f6ff; box-shadow: 0 1px 3px #0003; }
+#cutout-panel .cutout-mode-button:focus-visible, #cutout-panel summary:focus-visible { outline: 2px solid #88abff; outline-offset: 2px; }
+#cutout-panel .cutout-mode-icon { display: inline-block; width: 17px; height: 17px; border: 1px solid #ffffff80; border-radius: 3px; flex-shrink: 0; }
+#cutout-panel .cutout-checker { background: conic-gradient(#d9dfe8 25%, #7e899c 0 50%, #d9dfe8 0 75%, #7e899c 0) 0 0 / 8px 8px; }
+#cutout-panel .cutout-mask-icon { background: linear-gradient(90deg, #f0f2f5 50%, #181c24 50%); }
+#cutout-panel .cutout-mode-description { margin: 10px 0 20px; text-align: center; font-size: 11px; color: var(--ui-text-2, #aaa); }
+#cutout-panel .cutout-primary { min-height: 40px; margin: 0 0 8px; font-size: 13px; font-weight: 600; }
+#cutout-panel .cutout-batch { display: flex; justify-content: center; align-items: center; gap: 8px; min-height: 34px; margin: 0; }
+#cutout-panel .cutout-batch span { opacity: .55; }
+#cutout-panel .cutout-context-hint { margin: 10px 0 20px; text-align: center; font-size: 10px; line-height: 1.6; color: var(--ui-text-3, #888); }
+#cutout-panel .cutout-feedback { display: flex; align-items: flex-start; gap: 8px; padding: 11px 12px; border-radius: 6px; background: var(--ui-surface-2, #303030); }
+#cutout-panel #cutout-status { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 11px; line-height: 1.65; color: var(--ui-text-2, #bbb); }
+#cutout-panel .cutout-status-dot { width: 6px; height: 6px; margin-top: 6px; border-radius: 50%; background: #929ba9; flex-shrink: 0; }
+#cutout-panel [data-state="working"] .cutout-status-dot { background: #84aaff; }
+#cutout-panel [data-state="success"] .cutout-status-dot { background: #80be9a; }
+#cutout-panel [data-state="error"] .cutout-status-dot { background: #ed9b83; }
+#cutout-panel .cutout-connection { margin-top: 18px; border-top: 1px solid var(--ui-border, #414141); font-size: 11px; }
+#cutout-panel .cutout-connection summary { padding: 12px 0; cursor: pointer; color: var(--ui-text-3, #999); }
+#cutout-panel .cutout-connection-body { padding: 2px 0 10px; }
+#cutout-panel .cutout-connection-body .hint { margin-bottom: 0; line-height: 1.65; }
+#cutout-panel button:disabled { opacity: .5; cursor: wait; }
+
+#cutout-panel .cutout-quality { margin-bottom: 12px; }
+#cutout-panel .cutout-quality .cutout-mode-button { min-height: 34px; font-size: 12px; white-space: nowrap; }
